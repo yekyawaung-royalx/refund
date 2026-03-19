@@ -31,13 +31,16 @@ public function index(Request $request)
 
     // Accurate row count per partition (monthly)
     $rowCounts = DB::table('upload_data')
-        ->selectRaw("DATE_FORMAT(delivered_date, '%Y%m') as pname, COUNT(*) as rows")
-        ->groupBy('pname')
+        ->selectRaw("
+            DATE_FORMAT(delivered_date, '%Y%m') as pname,
+            COUNT(*) as total_rows
+        ")
+        ->groupBy(DB::raw("DATE_FORMAT(delivered_date, '%Y%m')"))
         ->get()
-        ->keyBy('pname'); // 'YYYYMM' => row count
+        ->keyBy('pname');
 
     $collection = $collection->map(function($p) use ($rowCounts) {
-        $monthKey = substr($p->PARTITION_NAME, 1); // 'pYYYYMM' → 'YYYYMM'
+        $monthKey = substr($p->PARTITION_NAME, 1); // 'PYYYYMM' → 'YYYYMM'
         return (object) array_merge((array) $p, [
             'TABLE_ROWS' => $rowCounts[$monthKey]->rows ?? 0,
             'TOTAL_MB' => round(($p->DATA_LENGTH + $p->INDEX_LENGTH) / 1024 / 1024, 2),
@@ -78,16 +81,16 @@ public function index(Request $request)
         $database = env('DB_DATABASE');
 
         $tables = DB::select("
-            SELECT 
-                table_name AS name,
-                table_rows AS rows,
-                ROUND(data_length / 1024 / 1024, 2) AS data_size_mb,
-                ROUND(index_length / 1024 / 1024, 2) AS index_size_mb,
-                ROUND((data_length + index_length) / 1024 / 1024, 2) AS total_size_mb
-            FROM information_schema.tables
-            WHERE table_schema = ?
-            ORDER BY total_size_mb DESC
-        ", [$database]);
+        SELECT 
+            table_name AS name,
+            table_rows AS total_rows,
+            ROUND(data_length / 1024 / 1024, 2) AS data_size_mb,
+            ROUND(index_length / 1024 / 1024, 2) AS index_size_mb,
+            ROUND((data_length + index_length) / 1024 / 1024, 2) AS total_size_mb
+        FROM information_schema.tables
+        WHERE table_schema = ?
+        ORDER BY total_size_mb DESC
+    ", [$database]);
 
         //return $tables;
         return Inertia::render('partition/DbMonitoring', [

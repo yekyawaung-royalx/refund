@@ -14,7 +14,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 interface Table {
   name: string;
-  rows: number;
+  total_rows: number;
   data_size_mb: string;
   index_size_mb: string;
   total_size_mb: string;
@@ -67,7 +67,7 @@ export default function DbMonitoring({ tables }: Props) {
                       {tables.map((t) => (
                         <tr key={t.name} className="border-b hover:bg-muted/40">
                           <td className="py-2 px-3 font-medium">{t.name}</td>
-                          <td className="px-3">{t.rows.toLocaleString()}</td>
+                          <td className="px-3">{t.total_rows.toLocaleString()}</td>
                           <td className="px-3">{formatSize(t.data_size_mb)}</td>
                           <td className="px-3">{formatSize(t.index_size_mb)}</td>
                           <td className="px-3">{formatSize(t.total_size_mb)}</td>
