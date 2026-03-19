@@ -130,7 +130,7 @@ const [refundLoaded, setRefundLoaded] = React.useState(false);
     <div className="flex flex-col gap-1">
       {/* Main Title */}
       <CardTitle className="text-xl md:text-2xl">
-        Dashboard
+        Main Dashboard
       </CardTitle>
 
       {/* Results In + Execution Time */}

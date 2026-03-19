@@ -41,7 +41,7 @@ class RefundController extends Controller
 
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 
-        return Inertia::render('Dashboard', [
+        return Inertia::render('MainDashboard', [
             'execution_time_ms' => $executionTimeMs,
             'stats' => [
                 'total' => [
