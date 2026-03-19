@@ -1,0 +1,97 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+use Illuminate\Http\Request;
+use App\Http\Controllers\RefundController;
+use App\Http\Controllers\UploadController;
+use App\Http\Controllers\PartitionController;
+use App\Http\Controllers\ReportingController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\AnalyticsController;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+Route::get('/generate-waybills', function (){
+    $total = 3000; 
+    $results = []; 
+
+    function randomLetters($length = 4){ 
+        $letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; 
+            $output = ''; for ($i = 0; $i < $length; $i++) { 
+                $output .= $letters[rand(0, 25)]; 
+            } 
+            return $output; 
+        } 
+        
+
+        function randomDigits($length = 4){ 
+            $digits = ''; for ($i = 0; $i < $length; $i++) { 
+                $digits .= rand(0,9); 
+            } 
+            return $digits; 
+        } 
+
+        for ($i = 0; $i < $total; $i++) { 
+            $prefix = randomLetters(3); 
+            $first = randomDigits(3); 
+            $second = randomDigits(4); 
+            $third = randomDigits(3); 
+            $postfix = randomLetters(3); 
+            //$results[] = "{$prefix}{$second}{$postfix}{$third}"; 
+            $results[] = "{$first}{$prefix}-{$postfix}{$second}-{$third}"; 
+        }
+
+        return response(implode("\n", $results)) ->header('Content-Type', 'text/plain');
+});
+
+
+Route::get('/', function () {
+    return Inertia::render('welcome');
+})->name('home');
+
+Route::get('/permissions', function () {
+   $permissions = DB::table('permissions')->get();
+
+   return $permissions;
+});
+
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', [RefundController::class, 'main_dashboard'])->name('dashboard');
+    Route::get('/refunds', [RefundController::class, 'refund_dashboard'])->name('refunds.dashboard');
+    Route::get('/refunds/upload', [UploadController::class, 'upload_file'])->name('upload.page');
+    Route::post('/refunds/uploaded-file', [UploadController::class, 'uploaded_file']);
+    Route::get('/refunds/uploaded-data', [RefundController::class, 'refunds']);
+    Route::get('/refunds/uploaded-files', [UploadController::class, 'uploaded_files'])->name('uploaded-files');
+    Route::get('/refunds/uploaded-files/{upload}',[UploadController::class, 'view_file']);
+    Route::get('/refunds/uploaded-files/{upload}/download',[UploadController::class, 'download_uploaded_file']);
+    Route::get('/refunds-by-customers', [RefundController::class, 'refunds_by_customers']);
+    Route::get('/exported-files', [RefundController::class, 'exported_files']);
+    Route::get('/exported-files/{id}', [RefundController::class, 'view_exported_file']);
+    Route::get('/exported-files/export/download', [RefundController::class, 'exported_file']);
+    Route::get('/download-export/{id}', [RefundController::class, 'download_exported_file']);
+    Route::get('/partitions', [PartitionController::class, 'index'])->name('partition.dashboard');
+    Route::get('/db-monitoring', [PartitionController::class, 'db_monitoring']);
+    Route::get('/reporting', [ReportingController::class, 'index']);
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/users/create', [UserController::class, 'create']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::get('/users/{id}', [UserController::class, 'view']);
+    Route::get('/jobs', [RefundController::class, 'job_lists']);
+    Route::get('/schedulers', [RefundController::class, 'scheduler_lists']);
+    Route::delete('/refunds/uploaded-files/{id}', [UploadController::class, 'destroy']);
+    Route::get('/reporting/search', [ReportingController::class, 'search']);
+
+    Route::get('/analytics-accounts', [AnalyticsController::class, 'analytics_accounts']);
+    Route::get('/analytics-accounts/create', [AnalyticsController::class, 'create_analytics_accounts']);
+    
+    Route::get('/recent-activities', [UploadController::class, 'recent_activities']);
+    Route::get('/recent-uploaded-files', [UploadController::class, 'recent_uploaded_files']);
+    Route::get('/recent-exported-files', [UploadController::class, 'recent_exported_files']);
+    Route::get('/recent-uploaded-data', [UploadController::class, 'recent_uploaded_data']);
+    Route::get('recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
+});
+
+require __DIR__.'/settings.php';
+require __DIR__.'/auth.php';
