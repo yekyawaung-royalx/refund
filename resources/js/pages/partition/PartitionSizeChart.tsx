@@ -9,11 +9,21 @@ import {
   Legend,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
+import type { TooltipItem } from "chart.js";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
+export type Partition = {
+  PARTITION_NAME: string;
+  PARTITION_DESCRIPTION: string;
+  DATA_LENGTH: number;
+  INDEX_LENGTH: number;
+  TABLE_ROWS?: number; 
+  TOTAL_MB?: number; 
+};
+
 interface Props {
-  partitions: any[];
+  partitions: Partition[];
 }
 
 export default function PartitionSizeChart({ partitions }: Props) {
@@ -37,14 +47,14 @@ export default function PartitionSizeChart({ partitions }: Props) {
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => `${context.raw} MB`,
+          label: (context: TooltipItem<"bar">) => `${context.raw} MB`,
         },
       },
     },
     scales: {
       x: {
         ticks: {
-          autoSkip: false, // show all partition labels
+          autoSkip: false,
           maxRotation: 45,
           minRotation: 0,
         },

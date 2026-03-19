@@ -64,7 +64,7 @@ public function index(Request $request)
     $nextPartitionName = 'P' . now()->addMonth()->format('Ym');
     $exists = $collection->contains(fn($p) => $p->PARTITION_NAME === $nextPartitionName);
 
-    //return $partitions;
+    //return $nextPartitionName;
     return Inertia::render('partition/Dashboard', [
         'partitions' => $paginated,
         'next_partition_exists' => $exists,

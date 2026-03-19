@@ -87,11 +87,16 @@ export interface UploadDataPagination {
   prev_page_url: string | null;
 }
 
-
+interface FileData {
+  title: string;
+  filename: string;
+  headers: string[];
+  rows: string[][];
+}
 
 export default function ViewUploadedFile() {
   const { results, file, execution_time_ms, used_partitions, uploadId, search: initialSearch } =
-    usePage<{ results: UploadDataPagination; file: any ; execution_time_ms: number; used_partitions: number; uploadId: number; search?: string }>().props;
+    usePage<{ results: UploadDataPagination; file: FileData ; execution_time_ms: number; used_partitions: number; uploadId: number; search?: string }>().props;
 
   const [search, setSearch] = React.useState(initialSearch || "");
   const data: UploadDataItem[] = results?.data ?? [];

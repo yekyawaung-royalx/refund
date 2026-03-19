@@ -4,7 +4,7 @@ import * as React from "react";
 import AppLayout from "@/layouts/app-layout";
 import { Head, usePage } from "@inertiajs/react";
 import { type BreadcrumbItem } from "@/types";
-
+import { PageProps as InertiaPageProps } from "@inertiajs/core";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,21 +24,21 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: "View File", href: "#" },
 ];
 
-interface PageProps {
+interface PageProps extends InertiaPageProps {
   filename: string;
   headers: string[];
   rows: string[][];
 }
 
 export default function View() {
-  const { filename, headers, rows } = usePage<PageProps>().props;
+  const { filename, headers, rows } =  usePage<PageProps>().props;
 
   const [search, setSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
 
   const perPage = 200;
 
-  // 🔎 search filter
+  // search filter
   const filteredRows = React.useMemo(() => {
     if (!search) return rows;
 

@@ -9,7 +9,7 @@ import {
   Legend,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
-
+import type { TooltipItem } from "chart.js";
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 interface Props {
@@ -43,7 +43,7 @@ export default function TableSizeChart({ tables }: Props) {
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => {
+          label: (context: TooltipItem<"bar">) => {
             const table = tables[context.dataIndex];
             return `${table.total_size_mb} MB • Rows: ${table.rows}`;
           },

@@ -13,12 +13,38 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: "Partitions", href: "#" },
 ];
 
+// Partition object type
+export type Partition = {
+  PARTITION_NAME: string;
+  PARTITION_DESCRIPTION: string;
+  DATA_LENGTH: number;
+  INDEX_LENGTH: number;
+  TABLE_ROWS?: number;
+};
+
+// Paginated partitions type (Laravel pagination structure)
+export type PaginatedPartitions = {
+  data: Partition[];        // current page items
+  current_page: number;     // current page number
+  last_page: number;        // total pages
+  prev_page_url: string | null;
+  next_page_url: string | null;
+};
+
+// Props type for Dashboard
+export type DashboardProps = {
+  partitions: PaginatedPartitions;
+  total_partitions: number;
+  next_partition_exists: boolean;
+  next_partition_name: string;
+};
+
 export default function Dashboard({
   partitions,
   total_partitions,
   next_partition_exists,
   next_partition_name,
-}: any) {
+}: DashboardProps) {
 
   /* =========================
      Helpers
@@ -161,7 +187,7 @@ export default function Dashboard({
                 </tr>
               )}
 
-              {sortedPartitions.map((p: any) => {
+              {sortedPartitions.map((p: Partition) => {
                 const monthLabel = formatPartitionName(p.PARTITION_NAME);
                 const isCurrent = monthLabel === currentMonth;
 

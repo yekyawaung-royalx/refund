@@ -41,7 +41,7 @@ class RefundController extends Controller
 
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 
-        return Inertia::render('dashboard', [
+        return Inertia::render('Dashboard', [
             'execution_time_ms' => $executionTimeMs,
             'stats' => [
                 'total' => [
@@ -214,7 +214,7 @@ class RefundController extends Controller
 
     public function exported_files(Request $request){
         $startTime = microtime(true);
-        $histories = DB::table('exports')->orderBy('id','desc')->paginate(20);
+        $exports = DB::table('exports')->orderBy('id','desc')->paginate(20);
 
         $endTime = microtime(true);
         // execution time (seconds)
@@ -223,11 +223,10 @@ class RefundController extends Controller
         // milliseconds
         $executionTimeMs = round($executionTime * 1000, 2);
 
-        //return response()->json($histories);
-
+        //return response()->json($exports);
         return Inertia::render('refunds/ExportedFile',[
             'execution_time_ms' => $executionTimeMs,
-            'exports' => $histories,
+            'exports' => $exports,
         ]);
     }
 

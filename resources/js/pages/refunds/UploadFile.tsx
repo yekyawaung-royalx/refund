@@ -4,7 +4,6 @@ import * as React from "react";
 import { Head, router } from "@inertiajs/react";
 import AppLayout from "@/layouts/app-layout";
 import { type BreadcrumbItem } from "@/types";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
