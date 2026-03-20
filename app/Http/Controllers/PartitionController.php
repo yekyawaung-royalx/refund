@@ -41,8 +41,11 @@ public function index(Request $request)
 
     $collection = $collection->map(function($p) use ($rowCounts) {
         $monthKey = substr($p->PARTITION_NAME, 1); // 'PYYYYMM' → 'YYYYMM'
+
+        $rows = $rowCounts[$monthKey]->total_rows ?? 0; // use total_rows
+
         return (object) array_merge((array) $p, [
-            'TABLE_ROWS' => $rowCounts[$monthKey]->rows ?? 0,
+            'TABLE_ROWS' => $rows,
             'TOTAL_MB' => round(($p->DATA_LENGTH + $p->INDEX_LENGTH) / 1024 / 1024, 2),
         ]);
     });
@@ -67,7 +70,7 @@ public function index(Request $request)
     $nextPartitionName = 'P' . now()->addMonth()->format('Ym');
     $exists = $collection->contains(fn($p) => $p->PARTITION_NAME === $nextPartitionName);
 
-    //return $nextPartitionName;
+    //return $paginated;
     return Inertia::render('partition/Dashboard', [
         'partitions' => $paginated,
         'next_partition_exists' => $exists,
