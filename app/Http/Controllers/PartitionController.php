@@ -79,31 +79,25 @@ public function index(Request $request)
     ]);
 }
 
-public function db_monitoring()
-{
-    $database = env('DB_DATABASE');
+    public function db_monitoring()
+    {
+        $database = env('DB_DATABASE');
 
-    // Get tables info including row count from partitions if exists
-    $tables = DB::select("
+        $tables = DB::select("
         SELECT 
-            t.table_name AS name,
-            COALESCE(SUM(p.table_rows), 0) AS total_rows,
-            ROUND(t.data_length / 1024 / 1024, 2) AS data_size_mb,
-            ROUND(t.index_length / 1024 / 1024, 2) AS index_size_mb,
-            ROUND((t.data_length + t.index_length) / 1024 / 1024, 2) AS total_size_mb
-        FROM information_schema.tables t
-        LEFT JOIN information_schema.partitions p
-            ON t.table_schema = p.table_schema
-           AND t.table_name = p.table_name
-        WHERE t.table_schema = ?
-        GROUP BY t.table_name, t.data_length, t.index_length
+            table_name AS name,
+            table_rows AS total_rows,
+            ROUND(data_length / 1024 / 1024, 2) AS data_size_mb,
+            ROUND(index_length / 1024 / 1024, 2) AS index_size_mb,
+            ROUND((data_length + index_length) / 1024 / 1024, 2) AS total_size_mb
+        FROM information_schema.tables
+        WHERE table_schema = ?
         ORDER BY total_size_mb DESC
     ", [$database]);
 
-    // Return to Inertia view
-    return Inertia::render('partition/DbMonitoring', [
-        'tables' => $tables,
-    ]);
-}
+        return Inertia::render('partition/DbMonitoring', [
+            'tables' => $tables,
+        ]);
+    }
         
 }

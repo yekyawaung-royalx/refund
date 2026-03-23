@@ -153,7 +153,7 @@ class CheckNoRefundFileJob implements ShouldQueue
                 'status' => 'validated',
             ]);
 
-            ImportNoRefundFileJob::dispatch($this->uploadId, $this->filePath);
+            ImportNoRefundFileJob::dispatch($this->uploadId, $this->filePath)->onQueue('import');;
 
         } catch (\Throwable $e) {
             Log::error($e);

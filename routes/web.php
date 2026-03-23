@@ -9,6 +9,7 @@ use App\Http\Controllers\PartitionController;
 use App\Http\Controllers\ReportingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\NoteController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -44,7 +45,6 @@ Route::get('/generate-waybills', function (){
 
         return response(implode("\n", $results)) ->header('Content-Type', 'text/plain');
 });
-
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -90,7 +90,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/recent-uploaded-files', [UploadController::class, 'recent_uploaded_files']);
     Route::get('/recent-exported-files', [UploadController::class, 'recent_exported_files']);
     Route::get('/recent-uploaded-data', [UploadController::class, 'recent_uploaded_data']);
-    Route::get('recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
+    Route::get('/recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
+
+    Route::get('/notes', [NoteController::class, 'notes']);
+    Route::get('/notes/laravel-queue', [NoteController::class, 'laravel_queue']);
+    Route::get('/notes/laravel-production', [NoteController::class, 'laravel_production']);
+    Route::get('/notes/mysql-storage-move-ssd200gb', [NoteController::class, 'mysql_storage_move_ssd200gb']);
+    Route::get('/notes/daily-export-scheduler-setup', [NoteController::class, 'daily_export_scheduler_setup']);
 });
 
 require __DIR__.'/settings.php';

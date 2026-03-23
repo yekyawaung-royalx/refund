@@ -131,8 +131,8 @@ const footerNavItems: NavItem[] = [
         icon: ScanSearchIcon,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
+        title: 'Developer Notes',
+        href: '/notes',
         icon: BookOpen,
     },
 ];
