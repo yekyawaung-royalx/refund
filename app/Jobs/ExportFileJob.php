@@ -92,7 +92,8 @@ class ExportFileJob
                     cod_payable_amount,
                     confirm_date,
                     from_city,
-                    to_city
+                    to_city,
+                    service_type
                 FROM upload_data PARTITION ({$partitionList})
                 WHERE refund = 0
                 ORDER BY id
@@ -119,7 +120,7 @@ class ExportFileJob
                 'Outbound Date','Accounting Date','Sender/Internal Reference','Sender/Display Name',
                 'Waybill No','From Analytic Account','To Analytic Account','Receiver Name',
                 'Weight','Total','Insurance Amount','COD Express Income','COD Income','COD Payable',
-                'Delivered Date','Confirm Date','From City','To City'
+                'Delivered Date','Confirm Date','From City','To City','Service Type'
             ]);
 
             $count = 0;
@@ -148,7 +149,8 @@ class ExportFileJob
                     $row->delivered_date,
                     $row->confirm_date,
                     $row->from_city,
-                    $row->to_city
+                    $row->to_city,
+                    $row->service_type
                 ]);
 
                 $rowIds[] = $row->id;
@@ -198,15 +200,15 @@ class ExportFileJob
             // -----------------------------
             // Notify user
             // -----------------------------
-            // Mail::to('yekyawaung1991@gmail.com')
-            //     ->queue(new \App\Mail\ExportCompletedMail(
-            //         $this->yearMonth,
-            //         $count,
-            //         $duration,
-            //         $fileName,
-            //         $startDt->toDateTimeString(),
-            //         $endDt->toDateTimeString()
-            //     ));
+            Mail::to('yekyawaung1991@gmail.com')
+                ->queue(new \App\Mail\ExportCompletedMail(
+                    $this->yearMonth,
+                    $count,
+                    $duration,
+                    $fileName,
+                    $startDt->toDateTimeString(),
+                    $endDt->toDateTimeString()
+                ));
 
         } catch (\Throwable $e) {
             // -----------------------------
