@@ -245,6 +245,7 @@ export default function ExportedFile() {
             <div className="flex justify-end items-center gap-2 mt-4">
               <Button
                 size="sm"
+                className="text-white bg-green-500 hover:bg-green-600"
                 disabled={!exports.prev_page_url}
                 onClick={() => exports.prev_page_url && router.visit(exports.prev_page_url)}
               >
@@ -255,6 +256,7 @@ export default function ExportedFile() {
               </span>
               <Button
                 size="sm"
+                className="text-white bg-green-500 hover:bg-green-600"
                 disabled={!exports.next_page_url}
                 onClick={() => exports.next_page_url && router.visit(exports.next_page_url)}
               >

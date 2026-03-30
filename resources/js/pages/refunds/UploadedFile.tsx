@@ -26,7 +26,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   CheckCircle,
   XCircle,
@@ -35,6 +40,7 @@ import {
   BugIcon,
   EyeIcon,
   Trash,
+  DownloadCloudIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +57,7 @@ export interface FileItem {
   filename: string;
   folder: string;
   file_path: string;
+  failed_path: string;
   total_rows: number;
   processed_rows: number;
   failed_rows: number;
@@ -90,7 +97,7 @@ export default function UploadedFile() {
   process_stats: "w-[140px]",
   job_stats: "w-[140px]",
   status: "w-[140px]",
-  actions: "w-[160px]",
+  actions: "w-[200px]",
 };
 
   const [deleteId, setDeleteId] = React.useState<number | null>(null);
@@ -157,6 +164,10 @@ export default function UploadedFile() {
   const handleDownload = (id: number) => {
     window.open(`/refunds/uploaded-files/${id}/download`, "_blank");
   };
+
+  const handleFailedDownload = (id: number) => {
+  window.open(`/finance-report/exported-files/${id}/failed-download`, "_blank");
+};
 
   const handleView = (id: number) => {
     router.visit(`/refunds/uploaded-files/${id}`);
@@ -237,7 +248,11 @@ export default function UploadedFile() {
                         </Button>
                       )}
 
-                      <Button
+                      
+<TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => handleDownload(item.id)}
@@ -245,8 +260,18 @@ export default function UploadedFile() {
                       >
                         <Download className="h-4 w-4" />
                       </Button>
+      </TooltipTrigger>
 
-                      <Button
+      <TooltipContent>
+        <p>Download Original CSV ({item.total_rows.toLocaleString()})</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => handleView(item.id)}
@@ -254,15 +279,57 @@ export default function UploadedFile() {
                       >
                         <EyeIcon className="h-4 w-4" />
                       </Button>
+      </TooltipTrigger>
+
+      <TooltipContent>
+        <p>View Passed Data ({item.processed_rows.toLocaleString()})</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+                      
+
+                      
+
+                      {/* 🔥 Failed CSV Download Button */}
+                      {item.failed_rows > 0 && item.failed_path && (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="sm"
+          className="bg-orange-500 hover:bg-orange-600 text-white"
+          onClick={() => handleFailedDownload(item.id)}
+        >
+          <DownloadCloudIcon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+
+      <TooltipContent>
+        <p>Download Failed CSV ({item.failed_rows.toLocaleString()})</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+)}
+
 
                       {/* Delete Button */}
-                      <Button
-                        size="sm"
+                      <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="sm"
                         className="text-white bg-red-500 hover:bg-red-600 flex items-center gap-1"
                         onClick={() => confirmDelete(item.id)}
                       >
                         <Trash className="h-4 w-4" />
                       </Button>
+      </TooltipTrigger>
+
+      <TooltipContent>
+        <p>Delete File & Data</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+                      
                     </TableCell>
                     </TableRow>
                   ))
@@ -280,6 +347,7 @@ export default function UploadedFile() {
             <div className="flex justify-end items-center gap-2 mt-4">
               <Button
                 size="sm"
+                className="text-white bg-green-500 hover:bg-green-600"
                 disabled={!files.prev_page_url}
                 onClick={() =>
                   files.prev_page_url &&
@@ -295,6 +363,7 @@ export default function UploadedFile() {
 
               <Button
                 size="sm"
+                className="text-white bg-green-500 hover:bg-green-600"
                 disabled={!files.next_page_url}
                 onClick={() =>
                   files.next_page_url &&

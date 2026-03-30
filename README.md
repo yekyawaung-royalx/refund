@@ -180,6 +180,14 @@ COLLATE utf8mb4_unicode_ci;
 
 
 SHOW VARIABLES LIKE 'local_infile';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| local_infile  | ON    |
++---------------+-------+
+
+// on local_infile
+SET GLOBAL local_infile = 1;
 
 //Check Table Engine
 SHOW TABLE STATUS WHERE Name = 'upload_data';

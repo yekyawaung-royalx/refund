@@ -15,6 +15,7 @@ class Upload extends Model
         'filename',
         'folder',
         'file_path',
+        'failed_path',
         'total_rows',
         'processed_rows',
         'failed_rows',

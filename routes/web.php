@@ -34,13 +34,13 @@ Route::get('/generate-waybills', function (){
         } 
 
         for ($i = 0; $i < $total; $i++) { 
-            $prefix = randomLetters(3); 
-            $first = randomDigits(3); 
+            $prefix = randomLetters(4); 
+            $first = randomDigits(2); 
             $second = randomDigits(4); 
-            $third = randomDigits(3); 
-            $postfix = randomLetters(3); 
+            $third = randomDigits(2); 
+            $postfix = randomLetters(4); 
             //$results[] = "{$prefix}{$second}{$postfix}{$third}"; 
-            $results[] = "{$first}{$prefix}-{$postfix}{$second}-{$third}"; 
+            $results[] = "{$first}{$prefix}{$second}{$postfix}{$third}"; 
         }
 
         return response(implode("\n", $results)) ->header('Content-Type', 'text/plain');
@@ -91,6 +91,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/recent-exported-files', [UploadController::class, 'recent_exported_files']);
     Route::get('/recent-uploaded-data', [UploadController::class, 'recent_uploaded_data']);
     Route::get('/recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
+    Route::get('/finance-report', [ReportingController::class, 'finance_report']);
+    Route::get('/finance-report/export', [ReportingController::class, 'export']);
+    Route::get('/finance-report/generate', [ReportingController::class, 'generate']);
+    Route::get('/finance-report/exported-files', [ReportingController::class, 'finance_exported_files']);
+    Route::get('/finance-report/exported-files/{id}', [ReportingController::class, 'view_finance_exported_files']);
 
     Route::get('/notes', [NoteController::class, 'notes']);
     Route::get('/notes/laravel-queue', [NoteController::class, 'laravel_queue']);

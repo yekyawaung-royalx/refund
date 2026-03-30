@@ -50,7 +50,7 @@ export default function DbMonitoring({ tables }: Props) {
                     <thead className="bg-muted">
                       <tr className="border-b">
                         <th className="text-left py-3 px-3">Table</th>
-                        <th className="text-left py-3 px-3">Rows</th>
+                        <th className="text-left py-3 px-3">Estimated Rows</th>
                         <th className="text-left py-3 px-3">Data Size</th>
                         <th className="text-left py-3 px-3">Index Size</th>
                         <th className="text-left py-3 px-3">Total Size</th>

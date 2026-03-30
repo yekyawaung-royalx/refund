@@ -10,6 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class CheckNoRefundFileJob implements ShouldQueue
 {
@@ -19,7 +20,7 @@ class CheckNoRefundFileJob implements ShouldQueue
     protected string $filePath;
 
     public $timeout = 1800;
-    public $tries = 3;
+    public $tries = 1;
 
     protected int $expectedColumns = 33;
     protected int $dbChunkSize = 1000;
@@ -54,13 +55,13 @@ class CheckNoRefundFileJob implements ShouldQueue
             $file->setCsvControl(",");
 
             // -------------------------
-            // 1️⃣ Header Validation
+            // Header Validation
             // -------------------------
             $headers = $file->fgetcsv();
             if (!$headers || count($headers) !== $this->expectedColumns) {
                 $upload->update([
                     'status' => 'failed',
-                    'error_message' => 'Invalid no refund file.Column structure does not match or file type is incorrect.Column count (must be 33)',
+                    'error_message' => 'Invalid no refund file. Column count must be 33.',
                 ]);
                 return;
             }
@@ -68,10 +69,10 @@ class CheckNoRefundFileJob implements ShouldQueue
             $rowNumber = 1;
             $errorRows = [];
             $fileWaybills = [];
-            $year = null;
+            $fileDate = null;
 
             // -------------------------
-            // 2️⃣ Row Validation Loop
+            // Row Validation Loop
             // -------------------------
             while (!$file->eof()) {
                 $row = $file->fgetcsv();
@@ -81,35 +82,57 @@ class CheckNoRefundFileJob implements ShouldQueue
 
                 // Column count check
                 if (count($row) !== $this->expectedColumns) {
-                    $errorRows[] = "Row {$rowNumber}: Invalid column count";
+                    if (count($errorRows) < 1000) {
+                        $errorRows[] = "Row {$rowNumber}: Invalid column count";
+                    }
                     continue;
                 }
 
                 // Date validation
-                if (empty($row[1]) || !strtotime($row[1])) {
-                    $errorRows[] = "Row {$rowNumber}: Invalid or empty outbound date in file.";
+                if (empty($row[1])) {
+                    if (count($errorRows) < 1000) {
+                        $errorRows[] = "Row {$rowNumber}: Empty outbound date";
+                    }
                     continue;
                 }
 
-                // Extract year for DB duplicate check
-                if (!$year) {
-                    $year = date('Y', strtotime($row[1]));
+                try {
+                    $date = Carbon::parse($row[1]);
+                } catch (\Exception $e) {
+                    if (count($errorRows) < 1000) {
+                        $errorRows[] = "Row {$rowNumber}: Invalid date format";
+                    }
+                    continue;
+                }
+
+                // Capture first valid date
+                if (!$fileDate) {
+                    $fileDate = $date;
                 }
 
                 // Waybill validation
                 $waybill = trim($row[9] ?? '');
                 if (empty($waybill)) {
-                    $errorRows[] = "Row {$rowNumber}: Waybill empty";
+                    if (count($errorRows) < 1000) {
+                        $errorRows[] = "Row {$rowNumber}: Waybill empty";
+                    }
                     continue;
                 }
 
                 // Duplicate in file
                 if (isset($fileWaybills[$waybill])) {
-                    $errorRows[] = "Row {$rowNumber}: Duplicate waybill in file ({$waybill})";
+                    if (count($errorRows) < 1000) {
+                        $errorRows[] = "Row {$rowNumber}: Duplicate waybill in file ({$waybill})";
+                    }
                     continue;
                 }
 
                 $fileWaybills[$waybill] = true;
+
+                // File size protection
+                if (count($fileWaybills) > 200000) {
+                    throw new \Exception("File too large");
+                }
             }
 
             // Stop if file-level errors
@@ -122,18 +145,31 @@ class CheckNoRefundFileJob implements ShouldQueue
             }
 
             // -------------------------
-            // 3️⃣ Database Duplicate Check
+            // Date range calculation (based on file)
+            // -------------------------
+            if (!$fileDate) {
+                throw new \Exception("No valid date found in file");
+            }
+
+            $endDate = $fileDate->copy()->endOfMonth();
+            $startDate = $fileDate->copy()->subMonths(2)->startOfMonth();
+
+            // -------------------------
+            // Database Duplicate Check
             // -------------------------
             $waybillNumbers = array_keys($fileWaybills);
 
             foreach (array_chunk($waybillNumbers, $this->dbChunkSize) as $chunk) {
+
                 $duplicates = DB::table('upload_data')
-                    ->whereYear('delivered_date', $year)   // Partition pruning
+                    ->whereBetween('delivered_date', [$startDate, $endDate])
                     ->whereIn('waybill_no', $chunk)
-                    ->pluck('waybill_no')
-                    ->toArray();
+                    ->pluck('waybill_no');
 
                 foreach ($duplicates as $dup) {
+                    if (count($errorRows) >= 1000) {
+                        break 2;
+                    }
                     $errorRows[] = "Duplicate waybill in database: {$dup}";
                 }
             }
@@ -147,20 +183,27 @@ class CheckNoRefundFileJob implements ShouldQueue
             }
 
             // -------------------------
-            // 4️⃣ Validated → Dispatch Import
+            // Validated → Dispatch Import
             // -------------------------
             $upload->update([
                 'status' => 'validated',
             ]);
 
-            ImportNoRefundFileJob::dispatch($this->uploadId, $this->filePath)->onQueue('import');;
+            ImportNoRefundFileJob::dispatch($this->uploadId, $this->filePath)
+                ->onQueue('import');
 
         } catch (\Throwable $e) {
-            Log::error($e);
+
+            Log::error('CheckNoRefundFileJob failed', [
+                'upload_id' => $this->uploadId,
+                'error' => $e->getMessage(),
+            ]);
+
             $upload->update([
                 'status' => 'failed',
                 'error_message' => substr($e->getMessage(), 0, 65000),
             ]);
+
             throw $e;
         }
     }

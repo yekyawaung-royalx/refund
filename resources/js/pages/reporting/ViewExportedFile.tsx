@@ -20,7 +20,7 @@ import {
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Dashboard", href: "/dashboard" },
-  { title: "Exports", href: "/exports" },
+  { title: "Finance Report", href: "/finance-report" },
   { title: "View File", href: "#" },
 ];
 
@@ -48,6 +48,7 @@ export default function View() {
       )
     );
   }, [search, rows]);
+  
 
   // pagination
   const totalPages = Math.ceil(filteredRows.length / perPage);
@@ -132,20 +133,20 @@ export default function View() {
 
               <Button
                 size="sm"
-                className="text-white bg-green-500 hover:bg-green-600"
+                variant="outline"
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
                 Previous
               </Button>
 
-              <span>
+              <span className="text-sm">
                 Page {page} of {totalPages}
               </span>
 
               <Button
                 size="sm"
-                className="text-white bg-green-500 hover:bg-green-600"
+                variant="outline"
                 disabled={page === totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >

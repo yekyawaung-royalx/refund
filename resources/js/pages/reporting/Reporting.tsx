@@ -281,7 +281,7 @@ const selectedTotals = React.useMemo(() => {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <Label>Select Outbound Date</Label>
+          <Label>Select Delivered Date</Label>
           <SingleDatePicker value={selectedDate} onChange={setSelectedDate} />
         </div>
         <Button variant="default" onClick={handleSearch}>

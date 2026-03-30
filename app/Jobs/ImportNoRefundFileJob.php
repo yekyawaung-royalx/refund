@@ -18,9 +18,10 @@ class ImportNoRefundFileJob implements ShouldQueue
 
     protected int $uploadId;
     protected string $filePath;
+    protected int $batchSize = 1500; //1500 × 33 columns = 49,500,(MySQL default 65,535 limit)
 
-    public $timeout = 3600; // max 1 hour execution
-    public $tries = 3;      // retry 3 times if fails
+    public $timeout = 3600;
+    public $tries = 3;
 
     public function __construct(int $uploadId, string $filePath)
     {
@@ -30,78 +31,44 @@ class ImportNoRefundFileJob implements ShouldQueue
 
     public function handle()
     {
-        // -----------------------------
-        // Start timer for performance tracking
-        // -----------------------------
         $startTime = microtime(true);
-
         $upload = Upload::find($this->uploadId);
         if (!$upload) return;
 
-        // -----------------------------
-        // Update status to processing
-        // -----------------------------
         $upload->update([
             'status' => 'processing',
             'attempts' => $this->attempts(),
         ]);
 
-        $batchSize = 1000; // batch insert size → InnoDB optimized
-        $processed = 0;
-        $failed = 0;
-        $insertData = [];
-
         if (!file_exists($this->filePath)) {
-            // -----------------------------
-            // Fail early if file missing
-            // -----------------------------
             $upload->update([
                 'status' => 'failed',
                 'error_message' => 'File not found',
-                'processed_duration' => round(microtime(true) - $startTime, 2)
+                'processed_duration' => round(microtime(true) - $startTime, 2),
             ]);
             return;
         }
 
+        $processed = 0;
+        $failed = 0;
+        $totalRows = 0;
+        $insertData = [];
+        $now = now();
+
         try {
-            // -----------------------------
-            // CSV streaming with SplFileObject
-            // Efficient memory usage for large files
-            // -----------------------------
             $file = new \SplFileObject($this->filePath);
             $file->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY | \SplFileObject::DROP_NEW_LINE);
             $file->setCsvControl(",");
 
             $file->rewind();
-            $headers = $file->fgetcsv(); // skip header
-
-            // -----------------------------
-            // Count total rows for progress tracking
-            // -----------------------------
-            $totalRows = 0;
-            while (!$file->eof()) {
-                $row = $file->fgetcsv();
-                if ($row === false || (count($row) === 1 && $row[0] === null)) continue;
-                $totalRows++;
-            }
-
-            $upload->update(['total_rows' => $totalRows]);
-
-            // -----------------------------
-            // Rewind to start actual import
-            // -----------------------------
-            $file->rewind();
             $file->fgetcsv(); // skip header
-            $now = now();
 
             while (!$file->eof()) {
                 $row = $file->fgetcsv();
                 if (!$row || $row[0] === null) continue;
 
+                $totalRows++;
                 try {
-                    // -----------------------------
-                    // Prepare batch data
-                    // -----------------------------
                     $insertData[] = [
                         'norefund_id' => $this->uploadId,
                         'outbound_date' => isset($row[1]) ? date('Y-m-d', strtotime($row[1])) : null,
@@ -118,7 +85,7 @@ class ImportNoRefundFileJob implements ShouldQueue
                         'to_city' => $row[12] ?? null,
                         'destination_branch' => $row[13] ?? null,
                         'other' => $row[14] ?? null,
-                        'receiver_name' => $row[15] ?? null,
+                        'receiver_name' => $this->clean($row[15] ?? null, 255),
                         'receiver_mobile' => $row[16] ?? null,
                         'receiver_address' => $this->clean($row[17] ?? null, 255),
                         'recipient_name' => $row[18] ?? null,
@@ -143,63 +110,49 @@ class ImportNoRefundFileJob implements ShouldQueue
 
                     $processed++;
 
-                    // -----------------------------
-                    // Batch insert using InnoDB transaction
-                    // Wrap each batch → atomic + redo log optimized
-                    // -----------------------------
-                    if (count($insertData) >= $batchSize) {
-                        DB::transaction(function() use ($insertData) {
+                    if (count($insertData) >= $this->batchSize) {
+                        DB::transaction(function () use ($insertData) {
                             DB::table('upload_data')->insert($insertData);
                         });
                         $insertData = [];
                     }
 
-                    // -----------------------------
-                    // Periodic progress update (every 2000 rows)
-                    // -----------------------------
-                    if ($processed % 2000 === 0) {
+                    // Update progress every batchSize
+                    if ($processed % $this->batchSize === 0) {
                         $upload->update([
+                            'total_rows' => $totalRows,
                             'processed_rows' => $processed,
                             'failed_rows' => $failed,
                         ]);
                     }
+
                 } catch (\Throwable $rowEx) {
                     if ($failed < 20) {
-                        Log::warning("Row failed: " . substr($rowEx->getMessage(),0,500));
+                        Log::warning("Row failed: " . substr($rowEx->getMessage(), 0, 500));
                     }
                     $failed++;
                 }
             }
 
-            // -----------------------------
-            // Insert remaining rows
-            // -----------------------------
+            // Insert any remaining rows
             if (!empty($insertData)) {
-                DB::transaction(function() use ($insertData) {
+                DB::transaction(function () use ($insertData) {
                     DB::table('upload_data')->insert($insertData);
                 });
             }
 
-            // -----------------------------
-            // Update completion status & duration
-            // -----------------------------
             $duration = round(microtime(true) - $startTime, 2);
             $upload->update([
+                'total_rows' => $totalRows,
                 'processed_rows' => $processed,
                 'failed_rows' => $failed,
                 'status' => 'completed',
                 'processed_duration' => $duration,
             ]);
 
-            // -----------------------------
-            // Dispatch next job for analytics
-            // -----------------------------
             AutoCheckAnalyticBranchJob::dispatch($this->uploadId);
 
         } catch (\Throwable $e) {
-            // -----------------------------
-            // Catch any job-level exception
-            // -----------------------------
             $duration = round(microtime(true) - $startTime, 2);
             Log::error(substr($e->getMessage(), 0, 2000), [
                 'upload_id' => $this->uploadId,
@@ -218,10 +171,6 @@ class ImportNoRefundFileJob implements ShouldQueue
         }
     }
 
-    // --------------------------------------
-    // Utility: Clean string values
-    // Prevent invalid UTF-8 characters + max length
-    // --------------------------------------
     protected function clean($value, $length = null)
     {
         if ($value === null) return null;

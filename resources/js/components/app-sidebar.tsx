@@ -17,8 +17,14 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'Reporting',
+        title: 'Refund Report',
         href: '/reporting',
+        permission: "",
+        icon: CalendarCheck,
+    },
+    {
+        title: 'Finance Report',
+        href: '/finance-report',
         permission: "",
         icon: CalendarCheck,
     },

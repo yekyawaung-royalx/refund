@@ -276,11 +276,11 @@ export default function ViewUploadedFile() {
             </Table>
 
             <div className="flex justify-end items-center mt-4 gap-2">
-              <Button size="sm" disabled={!results.prev_page_url} onClick={() => results.prev_page_url && router.visit(results.prev_page_url)}>
+              <Button size="sm" className="text-white bg-green-500 hover:bg-green-600" disabled={!results.prev_page_url} onClick={() => results.prev_page_url && router.visit(results.prev_page_url)}>
                 Previous
               </Button>
               <span>Page {results.current_page} of {results.last_page}</span>
-              <Button size="sm" disabled={!results.next_page_url} onClick={() => results.next_page_url && router.visit(results.next_page_url)}>
+              <Button size="sm" className="text-white bg-green-500 hover:bg-green-600" disabled={!results.next_page_url} onClick={() => results.next_page_url && router.visit(results.next_page_url)}>
                 Next
               </Button>
             </div>
