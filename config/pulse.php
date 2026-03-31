@@ -3,6 +3,7 @@
 use Laravel\Pulse\Http\Middleware\Authorize;
 use Laravel\Pulse\Pulse;
 use Laravel\Pulse\Recorders;
+use App\Http\Middleware\AuthorizePulse;
 
 return [
 
@@ -122,7 +123,7 @@ return [
 
     'middleware' => [
         'web',
-        Authorize::class,
+        AuthorizePulse::class,
     ],
 
     /*
