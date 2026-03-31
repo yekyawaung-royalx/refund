@@ -123,7 +123,7 @@ return [
 
     'middleware' => [
         'web',
-        AuthorizePulse::class,
+        \App\Http\Middleware\CustomAuthorizePulse::class,
     ],
 
     /*

@@ -111,6 +111,7 @@ return [
     */
 
     'api_middleware' => [
+        'web',
         \Opcodes\LogViewer\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         \App\Http\Middleware\CustomAuthorizeLogViewer::class,
         //\Opcodes\LogViewer\Http\Middleware\AuthorizeLogViewer::class,
@@ -173,12 +174,12 @@ return [
         '/var/log/nginx/*' => 'Nginx',
 
         // MacOS Apple Silicon logs
-        '/opt/homebrew/var/log/nginx/*',
-        '/opt/homebrew/var/log/httpd/*',
-        '/opt/homebrew/var/log/php-fpm.log',
-        '/opt/homebrew/var/log/postgres*log',
-        '/opt/homebrew/var/log/redis*log',
-        '/opt/homebrew/var/log/supervisor*log',
+        // '/opt/homebrew/var/log/nginx/*',
+        // '/opt/homebrew/var/log/httpd/*',
+        // '/opt/homebrew/var/log/php-fpm.log',
+        // '/opt/homebrew/var/log/postgres*log',
+        // '/opt/homebrew/var/log/redis*log',
+        // '/opt/homebrew/var/log/supervisor*log',
 
         // '/absolute/paths/supported',
     ],
