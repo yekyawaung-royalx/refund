@@ -35,26 +35,18 @@ class GenerateFinanceReportJob implements ShouldQueue
         $startTime = microtime(true);
 
         try {
-
-            // -----------------------------
-            // Category Conditions
-            // -----------------------------
             $categories = [
-                // COD Payable Amout + only)
                 'cod-payable' => function ($q) {
                     $q->where('u.cod_payable_amount', '>', 0);
                 },
-                // COD Payable Amout -, COD Total Amount == 0
                 'cod-not-collect' => function ($q) {
                     $q->where('u.cod_total_amount', 0)
                       ->where('u.cod_payable_amount', '<', 0);
                 },
-                // COD Payable Amout -, COD Total Amount +
                 'cod-to-collect' => function ($q) {
                     $q->where('u.cod_total_amount', '>', 0)
                       ->where('u.cod_payable_amount', '<', 0);
                 },
-                // COD Payable Amout == 0, COD Total Amount
                 'cod-zero' => function ($q) {
                     $q->where('u.cod_payable_amount', 0);
                 },
@@ -67,9 +59,6 @@ class GenerateFinanceReportJob implements ShouldQueue
                 'cod-zero'         => 'CODZR',
             ];
 
-            // -----------------------------
-            // Selected categories
-            // -----------------------------
             $selectedCategories = $this->category === 'all'
                 ? $categories
                 : [$this->category => $categories[$this->category] ?? null];
@@ -77,24 +66,21 @@ class GenerateFinanceReportJob implements ShouldQueue
             $insertData = [];
             $now = now();
 
-            // -----------------------------
-            // Loop categories
-            // -----------------------------
             foreach ($selectedCategories as $categoryName => $condition) {
-
                 if (!$condition) continue;
+
                 $journalCode = $journalMap[$categoryName] ?? 'CODPL';
 
                 $query = DB::table('upload_data as u')
                     ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
                     ->whereDate('u.delivered_date', $this->deliveredDate)
-                    ->whereNotNull('a.journal');
+                    ->whereNotNull('a.journal')
+                    ->where('u.finance_export', 0);
 
                 if ($this->branch && $this->branch !== 'ALL') {
                     $query->where('u.destination_branch', $this->branch);
                 }
 
-                // Apply condition
                 $condition($query);
 
                 $results = $query
@@ -110,8 +96,6 @@ class GenerateFinanceReportJob implements ShouldQueue
                     ->get();
 
                 foreach ($results as $row) {
-
-                    // 4 rows per category
                     $insertData[] = [
                         'journal' => $journalCode,
                         'delivered_date' => $this->deliveredDate,
@@ -126,7 +110,6 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
-
                     $insertData[] = [
                         'journal' => $journalCode,
                         'delivered_date' => $this->deliveredDate,
@@ -141,7 +124,6 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
-
                     $insertData[] = [
                         'journal' => $journalCode,
                         'delivered_date' => $this->deliveredDate,
@@ -156,7 +138,6 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
-
                     $insertData[] = [
                         'journal' => $journalCode,
                         'delivered_date' => $this->deliveredDate,
@@ -226,9 +207,9 @@ class GenerateFinanceReportJob implements ShouldQueue
             fclose($handle);
 
             // -----------------------------
-            // Save export record
+            // Save export record & get id
             // -----------------------------
-            DB::table('finance_exports')->insert([
+            $financeExportId = DB::table('finance_exports')->insertGetId([
                 'filename' => $fileName,
                 'filepath' => $relativePath,
                 'report_date' => $this->deliveredDate,
@@ -241,7 +222,31 @@ class GenerateFinanceReportJob implements ShouldQueue
                 'updated_at' => now(),
             ]);
 
-            Log::info("Finance report generated for {$this->deliveredDate}");
+            // -----------------------------
+            // Update upload_data.finance_export
+            // -----------------------------
+            foreach ($selectedCategories as $categoryName => $condition) {
+                $query = DB::table('upload_data as u')
+                    ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
+                    ->whereDate('u.delivered_date', $this->deliveredDate)
+                    ->whereNotNull('a.journal');
+
+                if ($this->branch && $this->branch !== 'ALL') {
+                    $query->where('u.destination_branch', $this->branch);
+                }
+
+                $condition($query);
+
+                $uploadIds = $query->pluck('u.id')->toArray();
+
+                if (!empty($uploadIds)) {
+                    DB::table('upload_data')
+                        ->whereIn('id', $uploadIds)
+                        ->update(['finance_export' => $financeExportId]);
+                }
+            }
+
+            Log::info("Finance report generated for {$this->deliveredDate} with finance_export ID {$financeExportId}");
 
         } catch (\Throwable $e) {
             Log::error("Finance report job failed: " . $e->getMessage());
