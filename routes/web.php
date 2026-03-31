@@ -97,6 +97,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/finance-report/generate', [ReportingController::class, 'generate']);
     Route::get('/finance-report/exported-files', [ReportingController::class, 'finance_exported_files']);
     Route::get('/finance-report/exported-files/{id}', [ReportingController::class, 'view_finance_exported_files']);
+    Route::get('/finance-report/exported-files/{id}/download',[ReportingController::class, 'download_exported_file']);
 
     Route::get('/notes', [NoteController::class, 'notes']);
     Route::get('/notes/laravel-queue', [NoteController::class, 'laravel_queue']);

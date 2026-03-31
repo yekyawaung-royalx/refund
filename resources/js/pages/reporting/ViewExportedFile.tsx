@@ -133,7 +133,7 @@ export default function View() {
 
               <Button
                 size="sm"
-                variant="outline"
+                className="text-white bg-green-500 hover:bg-green-600"
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
@@ -146,7 +146,7 @@ export default function View() {
 
               <Button
                 size="sm"
-                variant="outline"
+                className="text-white bg-green-500 hover:bg-green-600"
                 disabled={page === totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >

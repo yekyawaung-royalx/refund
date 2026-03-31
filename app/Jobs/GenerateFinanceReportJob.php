@@ -185,9 +185,9 @@ class GenerateFinanceReportJob implements ShouldQueue
             $folder = now()->format('Y-m');
             $timestamp = now()->format('Ymd_His');
             $fileName = "finance-report-{$this->deliveredDate}-{$timestamp}.csv";
-            $relativePath = "private/exports/{$folder}/{$fileName}";
+            $relativePath = "private/finance-reports/{$folder}/{$fileName}";
 
-            $directory = storage_path("app/private/finance_reports/{$folder}");
+            $directory = storage_path("app/private/finance-reports/{$folder}");
             if (!is_dir($directory)) mkdir($directory, 0755, true);
 
             $filePath = "{$directory}/{$fileName}";

@@ -241,7 +241,7 @@ export default function UploadedFile() {
                       {item.error_message && (
                         <Button
                           size="sm"
-                          className="text-white bg-red-500 hover:bg-red-600"
+                          className="text-white cursor-pointer bg-red-500 hover:bg-red-600"
                           onClick={() => setSelectedError(item.error_message)}
                         >
                           <BugIcon className="h-4 w-4" />
@@ -256,7 +256,7 @@ export default function UploadedFile() {
                         size="sm"
                         variant="secondary"
                         onClick={() => handleDownload(item.id)}
-                        className="flex items-center gap-1"
+                        className="flex cursor-pointer items-center gap-1"
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -275,7 +275,7 @@ export default function UploadedFile() {
                         size="sm"
                         variant="secondary"
                         onClick={() => handleView(item.id)}
-                        className="flex items-center gap-1"
+                        className="flex cursor-pointer items-center gap-1"
                       >
                         <EyeIcon className="h-4 w-4" />
                       </Button>
@@ -290,14 +290,14 @@ export default function UploadedFile() {
 
                       
 
-                      {/* 🔥 Failed CSV Download Button */}
+                      {/* Failed CSV Download Button */}
                       {item.failed_rows > 0 && item.failed_path && (
   <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           size="sm"
-          className="bg-orange-500 hover:bg-orange-600 text-white"
+          className="bg-orange-500 hover:bg-orange-600 cursor-pointer text-white"
           onClick={() => handleFailedDownload(item.id)}
         >
           <DownloadCloudIcon className="h-4 w-4" />
@@ -317,7 +317,7 @@ export default function UploadedFile() {
     <Tooltip>
       <TooltipTrigger asChild>
         <Button size="sm"
-                        className="text-white bg-red-500 hover:bg-red-600 flex items-center gap-1"
+                        className="text-white bg-red-500 hover:bg-red-600 cursor-pointer flex items-center gap-1"
                         onClick={() => confirmDelete(item.id)}
                       >
                         <Trash className="h-4 w-4" />

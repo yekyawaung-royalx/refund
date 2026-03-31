@@ -223,7 +223,7 @@ export default function UploadFile() {
                 <Button
                   type="submit"
                   disabled={uploading}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white"
+                  className="w-full cursor-pointer bg-green-500 hover:bg-green-600 text-white"
                 >
                   <UploadIcon />
                   {uploading ? (

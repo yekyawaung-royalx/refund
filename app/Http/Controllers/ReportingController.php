@@ -175,7 +175,7 @@ class ReportingController extends Controller
 
         $filename = $export->filename;
 
-        $filePath = storage_path("app/private/finance_reports/{$date}/{$filename}");
+        $filePath = storage_path("app/private/finance-reports/{$date}/{$filename}");
 
         if (!file_exists($filePath)) {
             abort(404, 'File not found');
@@ -204,6 +204,26 @@ class ReportingController extends Controller
             'headers' => $headers,
             'rows' => $rows
         ]);
+    }
+
+    public function download_exported_file($id)
+    {
+        $export = DB::table('finance_exports')->where('id', $id)->first();
+
+        if (!$export) {
+            abort(404, 'File not found');
+        }
+
+        // folder from created_at
+        $folder = Carbon::parse($export->created_at)->format('Y-m');
+
+        $filePath = storage_path("app/private/finance-reports/{$folder}/{$export->filename}");
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File does not exist');
+        }
+
+        return response()->download($filePath, $export->filename);
     }
 
 

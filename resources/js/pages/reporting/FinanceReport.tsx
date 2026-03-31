@@ -176,6 +176,10 @@ export default function FinanceReport() {
     }
   };
 
+  const handleDownload = (id: number) => {
+    window.open(`/finance-report/exported-files/${id}/download`, "_blank");
+  };
+
   // --- Export Handler ---
   const handleExport = async () => {
     try {
@@ -313,7 +317,7 @@ export default function FinanceReport() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(`/${file.filepath}`, "_blank")}
+                          onClick={() => handleDownload(file.id)}
                         >
                           <Download className="h-4 w-4" />
                         </Button>
