@@ -10,6 +10,7 @@ use App\Http\Controllers\ReportingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\NoteController;
+use App\Http\Controllers\LogController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -102,6 +103,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notes/laravel-production', [NoteController::class, 'laravel_production']);
     Route::get('/notes/mysql-storage-move-ssd200gb', [NoteController::class, 'mysql_storage_move_ssd200gb']);
     Route::get('/notes/daily-export-scheduler-setup', [NoteController::class, 'daily_export_scheduler_setup']);
+
+    Route::get('/logs', [LogController::class, 'logs']);
+    Route::get('/logs/view', [LogController::class, 'view'])->name('logs.view');
 });
 
 require __DIR__.'/settings.php';

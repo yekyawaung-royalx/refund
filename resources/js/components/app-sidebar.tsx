@@ -132,8 +132,8 @@ const BlogNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Log Viewer',
-        href: '/log-viewer',
+        title: 'Logs',
+        href: '/logs',
         icon: ScanSearchIcon,
     },
     {
