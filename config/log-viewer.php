@@ -112,7 +112,7 @@ return [
 
     'api_middleware' => [
         \Opcodes\LogViewer\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        \Opcodes\LogViewer\Http\Middleware\CustomAuthorizeLogViewer::class,
+        \App\Http\Middleware\CustomAuthorizeLogViewer::class,
         //\Opcodes\LogViewer\Http\Middleware\AuthorizeLogViewer::class,
     ],
 
