@@ -20,7 +20,6 @@ class ImportRefundFileJob implements ShouldQueue
 
     public $timeout = 3600;
     public $tries = 3;
-
     protected int $batchSize = 1000;
 
     public function __construct(int $uploadId, string $filePath)
@@ -57,7 +56,6 @@ class ImportRefundFileJob implements ShouldQueue
         $processed = 0;
         $failed = 0;
 
-        // 🔥 failed breakdown
         $failedInvalid = 0;
         $failedNotFound = 0;
         $failedAlreadyRefunded = 0;
@@ -75,9 +73,9 @@ class ImportRefundFileJob implements ShouldQueue
 
             $file->setCsvControl(",");
 
-            // -------- PASS 1 --------
+            // -------- PASS 1: COUNT TOTAL ROWS --------
             $file->rewind();
-            $file->fgetcsv();
+            $file->fgetcsv(); // skip header
 
             while (!$file->eof()) {
                 $row = $file->fgetcsv();
@@ -87,9 +85,9 @@ class ImportRefundFileJob implements ShouldQueue
 
             $upload->update(['total_rows' => $totalRows]);
 
-            // -------- PASS 2 --------
+            // -------- PASS 2: PROCESS ROWS --------
             $file->rewind();
-            $file->fgetcsv();
+            $file->fgetcsv(); // skip header
 
             $batch = [];
 
@@ -99,32 +97,32 @@ class ImportRefundFileJob implements ShouldQueue
                 if (!$row || $row[0] === null) continue;
 
                 try {
-                    $amount = $row[0] ?? null;
-                    $paymentDate = $row[2] ?? null;
+                    $amountRaw = $row[0] ?? null;
+                    $paymentDateRaw = $row[2] ?? null;
                     $waybillNo = $row[5] ?? null;
 
-                    // 🧠 date normalize
-                    if ($paymentDate) {
-                        $dt = \DateTime::createFromFormat('Y-m-d', $paymentDate);
-                        if (!$dt || $dt->format('Y-m-d') !== $paymentDate) {
-                            $dt = \DateTime::createFromFormat('n/j/Y', $paymentDate);
-                            if ($dt) {
-                                $paymentDate = $dt->format('Y-m-d');
-                            } else {
-                                $failed++;
-                                $failedInvalid++;
-
-                                $failedRows[] = [
-                                    'file_id' => $this->uploadId,
-                                    'waybill_no' => $waybillNo,
-                                    'reason' => 'invalid_data'
-                                ];
-                                continue;
-                            }
+                    // ---------------- DATE NORMALIZE ----------------
+                    $paymentDate = null;
+                    if ($paymentDateRaw) {
+                        // Try Y-m-d first
+                        $dt = \DateTime::createFromFormat('Y-m-d', $paymentDateRaw);
+                        if (!$dt) {
+                            // Try m/d/Y format (e.g., 3/31/2026)
+                            $dt = \DateTime::createFromFormat('n/j/Y', $paymentDateRaw);
+                        }
+                        if ($dt) {
+                            $paymentDate = $dt->format('Y-m-d');
                         }
                     }
 
-                    if (!$amount || !$paymentDate || !$waybillNo) {
+                    // ---------------- AMOUNT CHECK ----------------
+                    $amount = is_numeric($amountRaw) ? (float)$amountRaw : null;
+
+                    // 0 should be valid
+                    if ($amount === 0) $amount = 0;
+
+                    // ---------------- VALIDATION ----------------
+                    if ($amount === null || !$paymentDate || !$waybillNo) {
                         $failed++;
                         $failedInvalid++;
 
@@ -136,9 +134,7 @@ class ImportRefundFileJob implements ShouldQueue
                         continue;
                     }
 
-                    if (is_numeric($amount)) {
-                        $totalAmount += (float) $amount;
-                    }
+                    $totalAmount += $amount;
 
                     $partition = 'P' . date('Ym', strtotime($paymentDate));
 
@@ -164,6 +160,12 @@ class ImportRefundFileJob implements ShouldQueue
                 } catch (\Throwable $e) {
                     $failed++;
                     $failedInvalid++;
+
+                    $failedRows[] = [
+                        'file_id' => $this->uploadId,
+                        'waybill_no' => $row[5] ?? null,
+                        'reason' => 'exception'
+                    ];
                 }
             }
 
@@ -182,11 +184,10 @@ class ImportRefundFileJob implements ShouldQueue
                 }
             }
 
-            // -------- CSV EXPORT --------
+            // -------- CSV EXPORT FOR FAILED ROWS --------
             $failedPath = null;
 
             if (!empty($failedRows)) {
-
                 $folder = now()->format('Y-m');
                 $directory = storage_path("app/private/refund-failed/{$folder}");
 
@@ -198,7 +199,6 @@ class ImportRefundFileJob implements ShouldQueue
                 $fullPath = "{$directory}/{$fileName}";
 
                 $handle = fopen($fullPath, 'w');
-
                 fputcsv($handle, ['file_id', 'waybill_no', 'failed_reason']);
 
                 foreach ($failedRows as $row) {
@@ -259,7 +259,6 @@ class ImportRefundFileJob implements ShouldQueue
 
         $waybills = array_column($rows, 'waybill_no');
 
-        // 🔥 preload DB data (FAST)
         $existingRows = DB::table('upload_data')
             ->whereIn('waybill_no', $waybills)
             ->get()
