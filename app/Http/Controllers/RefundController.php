@@ -9,54 +9,50 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Artisan;
 use App\Jobs\FollowUpCheckAnalyticBranchJob;
+use Illuminate\Support\Facades\Cache;
 
 class RefundController extends Controller
 {
     public function main_dashboard(Request $request){
         $startTime = microtime(true);
+        $cacheKey = 'main_dashboard_stats';
+        
+        //Cache::forget('main_dashboard_stats');
 
-        $now = Carbon::now();
-        $startOfMonth = $now->copy()->startOfMonth();
-        $endOfMonth = $now->copy()->endOfMonth();
+        $stats = Cache::remember($cacheKey, 3600, function () {
+            $now = now();
+            $startOfMonth = $now->copy()->startOfMonth();
+            $endOfMonth = $now->copy()->endOfMonth();
 
-        // Total records
-        $totalRecords = DB::table('upload_data')->count();
-        $totalRecordsThisMonth = DB::table('upload_data')
-            ->whereBetween('delivered_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->count();
-
-        // Refund = 0
-        $refund0Total = DB::table('upload_data')->where('refund', 0)->count();
-        $refund0ThisMonth = DB::table('upload_data')
-            ->where('refund', 0)
-            ->whereBetween('delivered_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->count();
-
-        // Refund = 1
-        $refund1Total = DB::table('upload_data')->where('refund', 1)->count();
-        $refund1ThisMonth = DB::table('upload_data')
-            ->where('refund', 1)
-            ->whereBetween('delivered_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->count();
+            return [
+                'total' => [
+                    'all_time' => DB::table('upload_data')->count(),
+                    'this_month' => DB::table('upload_data')
+                        ->whereBetween('delivered_date', [$startOfMonth, $endOfMonth])
+                        ->count(),
+                ],
+                'refund0' => [
+                    'all_time' => DB::table('upload_data')->where('refund', 0)->count(),
+                    'this_month' => DB::table('upload_data')
+                        ->where('refund', 0)
+                        ->whereBetween('delivered_date', [$startOfMonth, $endOfMonth])
+                        ->count(),
+                ],
+                'refund1' => [
+                    'all_time' => DB::table('upload_data')->where('refund', 1)->count(),
+                    'this_month' => DB::table('upload_data')
+                        ->where('refund', 1)
+                        ->whereBetween('delivered_date', [$startOfMonth, $endOfMonth])
+                        ->count(),
+                ],
+            ];
+        });
 
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 
         return Inertia::render('MainDashboard', [
             'execution_time_ms' => $executionTimeMs,
-            'stats' => [
-                'total' => [
-                    'all_time' => $totalRecords,
-                    'this_month' => $totalRecordsThisMonth,
-                ],
-                'refund0' => [
-                    'all_time' => $refund0Total,
-                    'this_month' => $refund0ThisMonth,
-                ],
-                'refund1' => [
-                    'all_time' => $refund1Total,
-                    'this_month' => $refund1ThisMonth,
-                ],
-            ],
+            'stats' => $stats,
         ]);
     }
 

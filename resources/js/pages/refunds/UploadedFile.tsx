@@ -166,7 +166,7 @@ export default function UploadedFile() {
   };
 
   const handleFailedDownload = (id: number) => {
-  window.open(`/finance-report/exported-files/${id}/failed-download`, "_blank");
+  window.open(`/refunds/failed-files/${id}/download`, "_blank");
 };
 
   const handleView = (id: number) => {

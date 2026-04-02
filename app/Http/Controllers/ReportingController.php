@@ -198,7 +198,10 @@ class ReportingController extends Controller
 
         $headers = array_shift($rows);
         
-        //return $rows;
+        $rows = array_filter($rows, function ($row) {
+            return is_array($row);
+        });
+        return $rows;
         return Inertia::render('reporting/ViewExportedFile', [
             'filename' => $filename,
             'headers' => $headers,

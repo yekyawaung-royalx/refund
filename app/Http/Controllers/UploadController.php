@@ -231,5 +231,23 @@ class UploadController extends Controller
 
         return response()->download($filePath, $export->filename);
     }
+
+   public function download_failed_file($id)
+    {
+        $export = DB::table('uploads')->where('id', $id)->first();
+
+        if (!$export) {
+            abort(404, 'File not found');
+        }
+
+        // failed_path
+        $filePath = storage_path('app/' . $export->failed_path);
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File does not exist');
+        }
+
+        return response()->download($filePath);
+    }
    
 }
