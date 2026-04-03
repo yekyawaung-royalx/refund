@@ -245,24 +245,31 @@ class ImportRefundFileJob implements ShouldQueue
         if (empty($rows)) return;
 
         $tempTable = 'tmp_refund_' . $this->uploadId . '_' . uniqid();
+
+        // ⚡ Set charset & collation same as upload_data.waybill_no
         DB::statement("
             CREATE TEMPORARY TABLE $tempTable (
-                waybill_no VARCHAR(100) PRIMARY KEY,
+                waybill_no VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PRIMARY KEY,
                 payment_date DATE
             )
         ");
 
-        $insertData = array_map(fn($row) => ['waybill_no'=>$row['waybill_no'], 'payment_date'=>$row['payment_date']], $rows);
+        $insertData = array_map(fn($row) => ['waybill_no'=>$row['waybill_no'],'payment_date'=>$row['payment_date']], $rows);
         DB::table($tempTable)->insert($insertData);
 
-        DB::update("
-            UPDATE upload_data u
-            JOIN $tempTable t ON u.waybill_no = t.waybill_no
-            SET
-                u.refund = 1,
-                u.refund_id = ?,
-                u.payment_date = t.payment_date
-            WHERE u.refund = 0
-        ", [$this->uploadId]);
+        try {
+            DB::update("
+                UPDATE upload_data u
+                JOIN $tempTable t ON u.waybill_no = t.waybill_no
+                SET
+                    u.refund = 1,
+                    u.refund_id = ?,
+                    u.payment_date = t.payment_date
+                WHERE u.refund = 0
+            ", [$this->uploadId]);
+        } catch (\Throwable $e) {
+            Log::error("Batch update failed: ".$e->getMessage());
+            throw $e;
+        }
     }
 }
