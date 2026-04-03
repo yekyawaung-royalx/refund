@@ -31,7 +31,6 @@ class ImportRefundFileJob implements ShouldQueue
     public function handle()
     {
         $startTime = microtime(true);
-        $totalAmount = 0;
 
         $upload = Upload::find($this->uploadId);
         if (!$upload) return;
@@ -70,19 +69,16 @@ class ImportRefundFileJob implements ShouldQueue
                 \SplFileObject::SKIP_EMPTY |
                 \SplFileObject::DROP_NEW_LINE
             );
-
             $file->setCsvControl(",");
 
             // -------- PASS 1: COUNT TOTAL ROWS --------
             $file->rewind();
             $file->fgetcsv(); // skip header
-
             while (!$file->eof()) {
                 $row = $file->fgetcsv();
                 if ($row === false || (count($row) === 1 && $row[0] === null)) continue;
                 $totalRows++;
             }
-
             $upload->update(['total_rows' => $totalRows]);
 
             // -------- PASS 2: PROCESS ROWS --------
@@ -92,7 +88,6 @@ class ImportRefundFileJob implements ShouldQueue
             $batch = [];
 
             while (!$file->eof()) {
-
                 $row = $file->fgetcsv();
                 if (!$row || $row[0] === null) continue;
 
@@ -104,28 +99,19 @@ class ImportRefundFileJob implements ShouldQueue
                     // ---------------- DATE NORMALIZE ----------------
                     $paymentDate = null;
                     if ($paymentDateRaw) {
-                        // Try Y-m-d first
-                        $dt = \DateTime::createFromFormat('Y-m-d', $paymentDateRaw);
-                        if (!$dt) {
-                            // Try m/d/Y format (e.g., 3/31/2026)
-                            $dt = \DateTime::createFromFormat('n/j/Y', $paymentDateRaw);
-                        }
-                        if ($dt) {
-                            $paymentDate = $dt->format('Y-m-d');
-                        }
+                        $dt = \DateTime::createFromFormat('Y-m-d', $paymentDateRaw)
+                              ?: \DateTime::createFromFormat('n/j/Y', $paymentDateRaw);
+                        if ($dt) $paymentDate = $dt->format('Y-m-d');
                     }
 
                     // ---------------- AMOUNT CHECK ----------------
                     $amount = is_numeric($amountRaw) ? (float)$amountRaw : null;
-
-                    // 0 should be valid
                     if ($amount === 0) $amount = 0;
 
                     // ---------------- VALIDATION ----------------
                     if ($amount === null || !$paymentDate || !$waybillNo) {
                         $failed++;
                         $failedInvalid++;
-
                         $failedRows[] = [
                             'file_id' => $this->uploadId,
                             'waybill_no' => $waybillNo,
@@ -134,33 +120,26 @@ class ImportRefundFileJob implements ShouldQueue
                         continue;
                     }
 
-                    $totalAmount += $amount;
-
-                    $partition = 'P' . date('Ym', strtotime($paymentDate));
-
-                    $batch[$partition][] = [
+                    $batch[] = [
                         'waybill_no' => $waybillNo,
                         'payment_date' => $paymentDate
                     ];
 
-                    if (count($batch[$partition]) >= $this->batchSize) {
+                    if (count($batch) >= $this->batchSize) {
                         $this->processBatch(
-                            $partition,
-                            $batch[$partition],
+                            $batch,
                             $processed,
                             $failed,
                             $failedNotFound,
                             $failedAlreadyRefunded,
                             $failedRows
                         );
-
-                        $batch[$partition] = [];
+                        $batch = [];
                     }
 
                 } catch (\Throwable $e) {
                     $failed++;
                     $failedInvalid++;
-
                     $failedRows[] = [
                         'file_id' => $this->uploadId,
                         'waybill_no' => $row[5] ?? null,
@@ -170,52 +149,36 @@ class ImportRefundFileJob implements ShouldQueue
             }
 
             // leftover batch
-            foreach ($batch as $partition => $rows) {
-                if (!empty($rows)) {
-                    $this->processBatch(
-                        $partition,
-                        $rows,
-                        $processed,
-                        $failed,
-                        $failedNotFound,
-                        $failedAlreadyRefunded,
-                        $failedRows
-                    );
-                }
+            if (!empty($batch)) {
+                $this->processBatch(
+                    $batch,
+                    $processed,
+                    $failed,
+                    $failedNotFound,
+                    $failedAlreadyRefunded,
+                    $failedRows
+                );
             }
 
             // -------- CSV EXPORT FOR FAILED ROWS --------
             $failedPath = null;
-
             if (!empty($failedRows)) {
                 $folder = now()->format('Y-m');
                 $directory = storage_path("app/private/refund-failed/{$folder}");
-
-                if (!is_dir($directory)) {
-                    mkdir($directory, 0755, true);
-                }
+                if (!is_dir($directory)) mkdir($directory, 0755, true);
 
                 $fileName = "failed_{$this->uploadId}_" . time() . ".csv";
                 $fullPath = "{$directory}/{$fileName}";
 
                 $handle = fopen($fullPath, 'w');
                 fputcsv($handle, ['file_id', 'waybill_no', 'failed_reason']);
-
-                foreach ($failedRows as $row) {
-                    fputcsv($handle, [
-                        $row['file_id'],
-                        $row['waybill_no'],
-                        $row['reason']
-                    ]);
-                }
-
+                foreach ($failedRows as $row) fputcsv($handle, [$row['file_id'], $row['waybill_no'], $row['reason']]);
                 fclose($handle);
 
                 $failedPath = "private/refund-failed/{$folder}/{$fileName}";
             }
 
             $duration = round(microtime(true) - $startTime, 2);
-
             $upload->update([
                 'status' => 'completed',
                 'processed_rows' => $processed,
@@ -235,20 +198,16 @@ class ImportRefundFileJob implements ShouldQueue
             ]);
 
         } catch (\Throwable $e) {
-
             Log::error($e->getMessage());
-
             $upload->update([
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
             ]);
-
             throw $e;
         }
     }
 
     private function processBatch(
-        $partition,
         $rows,
         &$processed,
         &$failed,
@@ -256,7 +215,6 @@ class ImportRefundFileJob implements ShouldQueue
         &$failedAlreadyRefunded,
         &$failedRows
     ) {
-
         $waybills = array_column($rows, 'waybill_no');
 
         $existingRows = DB::table('upload_data')
@@ -265,74 +223,46 @@ class ImportRefundFileJob implements ShouldQueue
             ->keyBy('waybill_no');
 
         foreach ($rows as $row) {
-
             $db = $existingRows[$row['waybill_no']] ?? null;
 
             if (!$db) {
-                $failed++;
-                $failedNotFound++;
-
-                $failedRows[] = [
-                    'file_id' => $this->uploadId,
-                    'waybill_no' => $row['waybill_no'],
-                    'reason' => 'not_found'
-                ];
-
+                $failed++; $failedNotFound++;
+                $failedRows[] = ['file_id'=>$this->uploadId,'waybill_no'=>$row['waybill_no'],'reason'=>'not_found'];
             } elseif ($db->refund == 1) {
-                $failed++;
-                $failedAlreadyRefunded++;
-
-                $failedRows[] = [
-                    'file_id' => $this->uploadId,
-                    'waybill_no' => $row['waybill_no'],
-                    'reason' => 'already_refunded'
-                ];
-
+                $failed++; $failedAlreadyRefunded++;
+                $failedRows[] = ['file_id'=>$this->uploadId,'waybill_no'=>$row['waybill_no'],'reason'=>'already_refunded'];
             } else {
                 $processed++;
             }
         }
 
-        // only update valid ones
-        $validRows = array_filter($rows, function ($row) use ($existingRows) {
-            return isset($existingRows[$row['waybill_no']]) &&
-                   $existingRows[$row['waybill_no']]->refund == 0;
-        });
-
-        if (!empty($validRows)) {
-            $this->updateBatch($partition, $validRows);
-        }
+        $validRows = array_filter($rows, fn($row) => isset($existingRows[$row['waybill_no']]) && $existingRows[$row['waybill_no']]->refund == 0);
+        if (!empty($validRows)) $this->updateBatch($validRows);
     }
 
-    protected function updateBatch($partition, $rows)
+    protected function updateBatch($rows)
     {
         if (empty($rows)) return;
 
-        $caseSql = [];
-        $params = [$this->uploadId];
+        $tempTable = 'tmp_refund_' . $this->uploadId . '_' . uniqid();
+        DB::statement("
+            CREATE TEMPORARY TABLE $tempTable (
+                waybill_no VARCHAR(100) PRIMARY KEY,
+                payment_date DATE
+            )
+        ");
 
-        foreach ($rows as $row) {
-            $caseSql[] = "WHEN ? THEN ?";
-            $params[] = $row['waybill_no'];
-            $params[] = $row['payment_date'];
-        }
-
-        $caseSql = implode(' ', $caseSql);
-
-        $waybillNos = array_column($rows, 'waybill_no');
-        $placeholders = implode(',', array_fill(0, count($waybillNos), '?'));
-
-        $params = array_merge($params, $waybillNos);
+        $insertData = array_map(fn($row) => ['waybill_no'=>$row['waybill_no'], 'payment_date'=>$row['payment_date']], $rows);
+        DB::table($tempTable)->insert($insertData);
 
         DB::update("
-            UPDATE upload_data PARTITION ($partition)
+            UPDATE upload_data u
+            JOIN $tempTable t ON u.waybill_no = t.waybill_no
             SET
-                refund = 1,
-                refund_id = ?,
-                payment_date = CASE waybill_no
-                    $caseSql
-                END
-            WHERE waybill_no IN ($placeholders)
-        ", $params);
+                u.refund = 1,
+                u.refund_id = ?,
+                u.payment_date = t.payment_date
+            WHERE u.refund = 0
+        ", [$this->uploadId]);
     }
 }
