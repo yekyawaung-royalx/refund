@@ -68,7 +68,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/refunds/uploaded-files/{upload}',[UploadController::class, 'view_file']);
     Route::get('/refunds/uploaded-files/{upload}/download',[UploadController::class, 'download_uploaded_file']);
     Route::get('/refunds/failed-files/{upload}/download',[UploadController::class, 'download_failed_file']);         
-
+    Route::get('/search', [RefundController::class, 'search']);
 
     Route::get('/refunds-by-customers', [RefundController::class, 'refunds_by_customers']);
     Route::get('/exported-files', [RefundController::class, 'exported_files']);

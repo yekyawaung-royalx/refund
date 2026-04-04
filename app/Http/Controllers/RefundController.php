@@ -5,6 +5,7 @@ use Carbon\Carbon;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use App\Models\Export;
+use App\Models\Upload;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Artisan;
@@ -346,5 +347,55 @@ class RefundController extends Controller
             ->get();
 
         return response()->json($recent_refund_summaries);
+    }
+
+    public function search(Request $request)
+    {
+        $startTime = microtime(true);
+
+        // Supported filters
+        $filters = ['waybill_no', 'reference_no', 'customer'];
+
+        // Determine which filter is being used
+        $filterBy = null;
+        foreach ($filters as $f) {
+            if ($request->filled($f)) {
+                $filterBy = $f;
+                break;
+            }
+        }
+
+        // Default: waybill_no if nothing specified
+        if (!$filterBy) {
+            $filterBy = 'waybill_no';
+        }
+
+        $queryValue = $request->input($filterBy);
+
+        // Align param to actual table column
+        $columnMap = [
+            'waybill_no'   => 'waybill_no',
+            'reference_no' => 'customer_reference_no', // map reference_no to actual column
+            'customer'     => 'customer',
+        ];
+
+        $columnName = $columnMap[$filterBy] ?? 'waybill_no';
+
+        // Build query dynamically
+        $refundsQuery = DB::table('upload_data');
+        if ($queryValue) {
+            $refundsQuery->where($columnName, 'like', $queryValue . '%');
+        }
+
+        $refunds = $refundsQuery->paginate(200)->withQueryString(); // preserve filter/query in pagination
+
+        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+
+        return Inertia::render('refunds/SearchResult', [
+            'execution_time_ms' => $executionTimeMs,
+            'results'           => $refunds,
+            'search'            => $queryValue,
+            'filter_by'         => $filterBy, // current filter param
+        ]);
     }
 }
