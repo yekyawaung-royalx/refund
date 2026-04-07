@@ -132,11 +132,11 @@ export default function UploadFile() {
       <label
         key={c.value}
         className={cn(
-          "cursor-pointer rounded-xl hover:bg-gray-800 border p-4 flex items-start gap-3 transition shadow-sm",
-          category === c.value
-            ? "border-green-500 text-green-500 bg-gray-900 shadow-lg"
-            : "border-muted "
-        )}
+            "cursor-pointer rounded-xl border p-4 flex items-start gap-3 transition shadow-sm",
+            category === c.value
+              ? "border-green-500 text-green-500 bg-green-100 dark:bg-gray-900 shadow-lg"
+              : "border-muted bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
+          )}
       >
         {/* Hidden radio input */}
         <input
@@ -196,7 +196,7 @@ export default function UploadFile() {
                   onClick={() => fileInputRef.current?.click()}
                   className={cn(
                     "border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition",
-                    dragActive ? "border-green-500 bg-sky-50" : "border-muted"
+                    dragActive ? "border-green-500 bg-sky-50" : "border-gray-400 dark:border-gray-600"
                   )}
                 >
                   <UploadCloud className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />

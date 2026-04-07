@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Artisan;
 use App\Jobs\FollowUpCheckAnalyticBranchJob;
 use Illuminate\Support\Facades\Cache;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
 
 class RefundController extends Controller
 {
@@ -397,5 +399,47 @@ class RefundController extends Controller
             'search'            => $queryValue,
             'filter_by'         => $filterBy, // current filter param
         ]);
+    }
+
+
+    public function download_upload_data(Request $request)
+    {
+        $from = $request->from ? \Carbon\Carbon::parse($request->from) : now()->startOfMonth();
+        $to = $request->to ? \Carbon\Carbon::parse($request->to) : now()->endOfMonth();
+
+        $filename = 'uploaded_data_' . now()->format('Ymd_His') . '.csv';
+
+        $response = new StreamedResponse(function () use ($from, $to, $request) {
+            $handle = fopen('php://output', 'w');
+            $first = true;
+
+            $query = DB::table('upload_data') // always main table
+                ->whereNotNull('delivered_date')
+                ->whereBetween('delivered_date', [$from->format('Y-m-d'), $to->format('Y-m-d')]);
+
+            if ($request->category && $request->category !== 'all') {
+                $query->where('refund', $request->category === 'refund' ? 1 : 0);
+            }
+
+            $query->orderBy('id')->chunk(5000, function ($rows) use ($handle, &$first) {
+                foreach ($rows as $row) {
+                    $data = (array) $row;
+
+                    if ($first) {
+                        fputcsv($handle, array_keys($data));
+                        $first = false;
+                    }
+
+                    fputcsv($handle, array_values($data));
+                }
+            });
+
+            fclose($handle);
+        });
+
+        $response->headers->set('Content-Type', 'text/csv');
+        $response->headers->set('Content-Disposition', "attachment; filename={$filename}");
+
+        return $response;
     }
 }

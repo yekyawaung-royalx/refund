@@ -64,6 +64,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/refunds/upload', [UploadController::class, 'upload_file'])->name('upload.page');
     Route::post('/refunds/uploaded-file', [UploadController::class, 'uploaded_file']);
     Route::get('/refunds/uploaded-data', [RefundController::class, 'refunds']);
+    Route::get('/refunds/uploaded-data/download', [RefundController::class, 'download_upload_data'])->name('uploaded-data.download');
     Route::get('/refunds/uploaded-files', [UploadController::class, 'uploaded_files'])->name('uploaded-files');
     Route::get('/refunds/uploaded-files/{upload}',[UploadController::class, 'view_file']);
     Route::get('/refunds/uploaded-files/{upload}/download',[UploadController::class, 'download_uploaded_file']);

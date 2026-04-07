@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronDown } from "lucide-react";
+import {  CalendarIcon, Check, ChevronDown, Download, Search } from "lucide-react";
 import AppLayout from "@/layouts/app-layout";
 import { type BreadcrumbItem } from "@/types";
 import { Head, usePage, router } from "@inertiajs/react";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
+import { toast } from "sonner";
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Dashboard", href: "/dashboard" },
@@ -112,10 +113,11 @@ function DateRangePicker({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="w-[280px] justify-start text-left font-normal">
+        <Button variant="outline" className="w-[240px] justify-between flex items-center font-normal">
           {value.from && value.to
             ? `${format(value.from, "MMM d, yyyy")} - ${format(value.to, "MMM d, yyyy")}`
             : "Select date range"}
+            <CalendarIcon className="ml-2 h-4 w-4 opacity-70" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">
@@ -198,14 +200,14 @@ export default function UploadedData() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[170px] justify-between flex items-center"
+                    className="w-[140px] justify-between flex items-center"
                   >
                     <span>{categories.find(c => c.value === selectedCategory)?.label}</span>
                     <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
                   </Button>
                 </PopoverTrigger>
 
-                <PopoverContent className="w-[160px] p-0">
+                <PopoverContent className="w-[140px] p-0">
                   <Command>
                     <CommandGroup>
                       {categories.map((cat) => (
@@ -225,19 +227,57 @@ export default function UploadedData() {
               </Popover>
 
               <DateRangePicker value={dateRange} onChange={setDateRange} />
+              <Popover>
+  <PopoverTrigger asChild>
+    <Button
+      variant="outline"
+      className="w-[120px] justify-between flex items-center"
+    >
+      <span>Actions</span>
+      <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
+    </Button>
+  </PopoverTrigger>
 
-              <Button
-                variant="outline"
-                onClick={() => {
-                  const params: Record<string, string> = {};
-                  if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
-                  if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
-                  params.category = selectedCategory as string;
-                  router.visit("/refunds/uploaded-data", { method: "get", data: params });
-                }}
-              >
-                Search
-              </Button>
+  <PopoverContent className="w-[120px] p-0">
+    <Command>
+      <CommandGroup>
+        <CommandItem 
+          className="justify-start"
+          onSelect={() => {
+            // Search action
+            const params: Record<string, string> = {};
+            if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
+            if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
+            params.category = selectedCategory as string;
+
+            router.visit("/refunds/uploaded-data", { method: "get", data: params });
+          }}
+        >
+          <Search className="mr-2 h-4 w-4" />
+          Search
+        </CommandItem>
+
+        <CommandItem
+          onSelect={() => {
+            // Download action
+            const params: Record<string, string> = {};
+            if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
+            if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
+            params.category = selectedCategory as string;
+            const queryString = new URLSearchParams(params).toString();
+
+            window.location.href = `/refunds/uploaded-data/download?${queryString}`;
+
+            toast.success("CSV export started! Check your downloads folder.");
+          }}
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Download
+        </CommandItem>
+      </CommandGroup>
+    </Command>
+  </PopoverContent>
+</Popover>
 
               {/* Column Dropdown */}
               <Popover open={columnsPopoverOpen} onOpenChange={setColumnsPopoverOpen}>
