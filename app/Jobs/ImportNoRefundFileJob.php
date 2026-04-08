@@ -88,7 +88,7 @@ class ImportNoRefundFileJob implements ShouldQueue
                         'receiver_name' => $this->clean($row[15] ?? null, 255),
                         'receiver_mobile' => $row[16] ?? null,
                         'receiver_address' => $this->clean($row[17] ?? null, 255),
-                        'recipient_name' => $row[18] ?? null,
+                        'recipient_name' => $this->clean($row[18] ?? null, 255),
                         'recipient_phone' => $this->clean($row[19] ?? null, 255),
                         'payment_by' => $row[20] ?? null,
                         'payment_type' => $row[21] ?? null,
@@ -174,7 +174,21 @@ class ImportNoRefundFileJob implements ShouldQueue
     protected function clean($value, $length = null)
     {
         if ($value === null) return null;
+
+        // Fix encoding
         $value = iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
+        // Fix invalid escaped quotes: \" → "
+        $value = str_replace('\\"', '"', $value);
+
+        // Convert " → "" (CSV safe)
+        $value = str_replace('"', '""', $value);
+
+        // Remove unwanted control chars (keep Myanmar + Unicode)
+        $value = preg_replace('/[\x00-\x1F\x7F]/u', '', $value);
+
+        $value = trim($value);
+
         return $length ? mb_substr($value, 0, $length, 'UTF-8') : $value;
     }
 }

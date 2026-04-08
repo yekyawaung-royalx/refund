@@ -50,9 +50,14 @@ class CheckNoRefundFileJob implements ShouldQueue
         }
 
         try {
+            // -------------------------
+            // Preprocess CSV to fix broken quotes/newlines/backslash
+            // -------------------------
+            $this->fixBrokenCsv($this->filePath);
+
             $file = new \SplFileObject($this->filePath);
             $file->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY);
-            $file->setCsvControl(",");
+            $file->setCsvControl(',', '"');
 
             // -------------------------
             // Header Validation
@@ -80,6 +85,21 @@ class CheckNoRefundFileJob implements ShouldQueue
 
                 $rowNumber++;
 
+                // Remove backslashes from all columns
+                $row = array_map(fn($col) => $col !== null ? str_replace('\\', '', $col) : $col, $row);
+
+                // -------------------------------
+                // Fix extra columns in receiver_name/address
+                // -------------------------------
+                $addressIndex = 17; // receiver_name / address
+                while (count($row) > $this->expectedColumns) {
+                    $row[$addressIndex] .= ' ' . array_pop($row);
+                }
+
+                while (count($row) < $this->expectedColumns) {
+                    $row[] = '';
+                }
+
                 // Column count check
                 if (count($row) !== $this->expectedColumns) {
                     if (count($errorRows) < 1000) {
@@ -105,7 +125,6 @@ class CheckNoRefundFileJob implements ShouldQueue
                     continue;
                 }
 
-                // Capture first valid date
                 if (!$fileDate) {
                     $fileDate = $date;
                 }
@@ -115,6 +134,15 @@ class CheckNoRefundFileJob implements ShouldQueue
                 if (empty($waybill)) {
                     if (count($errorRows) < 1000) {
                         $errorRows[] = "Row {$rowNumber}: Waybill empty";
+                    }
+                    continue;
+                }
+
+                // Weight validation
+                $weight = (float)($row[23] ?? 0);
+                if ($weight <= 0) {
+                    if (count($errorRows) < 1000) {
+                        $errorRows[] = "Row {$rowNumber}: Weight cannot be 0 or empty";
                     }
                     continue;
                 }
@@ -206,5 +234,37 @@ class CheckNoRefundFileJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    private function fixBrokenCsv(string $filePath)
+    {
+        $content = file_get_contents($filePath);
+
+        // fix wrong escape \" → "
+        $content = str_replace('\\"', '"', $content);
+
+        $lines = preg_split("/\r\n|\n|\r/", $content);
+
+        $fixedLines = [];
+        $buffer = '';
+        $inQuotes = false;
+
+        foreach ($lines as $line) {
+
+            $buffer .= ($buffer === '' ? '' : ' ') . $line;
+
+            $quoteCount = substr_count($line, '"');
+
+            if ($quoteCount % 2 !== 0) {
+                $inQuotes = !$inQuotes;
+            }
+
+            if (!$inQuotes) {
+                $fixedLines[] = $buffer;
+                $buffer = '';
+            }
+        }
+
+        file_put_contents($filePath, implode("\n", $fixedLines));
     }
 }

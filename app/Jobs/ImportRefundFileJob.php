@@ -246,7 +246,7 @@ class ImportRefundFileJob implements ShouldQueue
 
         $tempTable = 'tmp_refund_' . $this->uploadId . '_' . uniqid();
 
-        // ⚡ Set charset & collation same as upload_data.waybill_no
+        // Set charset & collation same as upload_data.waybill_no
         DB::statement("
             CREATE TEMPORARY TABLE $tempTable (
                 waybill_no VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PRIMARY KEY,

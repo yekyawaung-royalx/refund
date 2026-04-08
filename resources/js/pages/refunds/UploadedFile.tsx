@@ -397,7 +397,7 @@ export default function UploadedFile() {
               Cancel
             </Button>
 
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" className="text-white" onClick={handleDelete}>
               Delete
             </Button>
           </DialogFooter>
@@ -414,7 +414,7 @@ export default function UploadedFile() {
             <DialogTitle>Error Log</DialogTitle>
           </DialogHeader>
 
-          <div className="max-h-[400px] overflow-auto bg-slate-950 p-4 rounded-md">
+          <div className="max-h-[400px] overflow-auto bg-red-500 p-4 rounded-md">
             <pre className="text-sm text-white whitespace-pre-wrap">
               {selectedError}
             </pre>

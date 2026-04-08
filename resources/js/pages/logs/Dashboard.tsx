@@ -33,7 +33,7 @@ export default function LogList({ logs }: Props) {
           </CardHeader>
 
           <CardContent className="text-sm text-muted-foreground">
-            Total Logs: {logs?.length ?? 0}
+            Total Logs: {(logs?.length ?? 0) + 1}
           </CardContent>
         </Card>
 
@@ -44,6 +44,20 @@ export default function LogList({ logs }: Props) {
               No logs found.
             </div>
           )}
+          <a href="/log-viewer" target="_blank">
+    <Card className="hover:shadow-md transition cursor-pointer">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-3 text-base text-green-500">
+          <FileTextIcon className="h-6 w-6 text-muted-foreground" />
+          Laravel Log Viewer
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="text-sm text-muted-foreground break-all">
+        logs/laravel.log
+      </CardContent>
+    </Card>
+  </a>
 
           {logs?.map((log, index) => (
   <Link
@@ -64,6 +78,8 @@ export default function LogList({ logs }: Props) {
     </Card>
   </Link>
 ))}
+
+
         </div>
 
       </div>

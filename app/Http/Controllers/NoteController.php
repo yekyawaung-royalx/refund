@@ -28,6 +28,10 @@ class NoteController extends Controller
                 'title' => 'Daily Export Scheduler Setup',
                 'link' => '/notes/daily-export-scheduler-setup',
             ],
+            [
+                'title' => 'CSV Import Validation Rules',
+                'link' => '/notes/csv-import-validation-rules',
+            ],
         ];
 
         return Inertia::render('notes/Dashboard', [
@@ -88,6 +92,22 @@ class NoteController extends Controller
     public function daily_export_scheduler_setup()
     {
         $path = resource_path('js/pages/notes/daily-export-scheduler-setup.md');
+
+        if (!file_exists($path)) {
+            abort(404, 'Markdown file not found.');
+        }
+
+        $content = file_get_contents($path);
+
+        // JS safe injection using json_encode
+        $jsSafeContent = json_encode($content);
+
+        return view('notes.show', ['content' => $jsSafeContent]);
+    }
+
+    public function csv_import_validation_rules()
+    {
+        $path = resource_path('js/pages/notes/validation-rules.md');
 
         if (!file_exists($path)) {
             abort(404, 'Markdown file not found.');
