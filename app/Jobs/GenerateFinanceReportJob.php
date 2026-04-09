@@ -95,10 +95,16 @@ class GenerateFinanceReportJob implements ShouldQueue
                     )
                     ->get();
 
+                // Category value insert at first row
+                $isFirstRow = true;
+
                 foreach ($results as $row) {
+                    $journalValue = $isFirstRow ? $journalCode : null;
+                    $deliveredDate = $isFirstRow ? $this->deliveredDate : null;
+
                     $insertData[] = [
-                        'journal' => $journalCode,
-                        'delivered_date' => $this->deliveredDate,
+                        'journal' => $journalValue,
+                        'delivered_date' => $deliveredDate,
                         'ref' => null,
                         'analytic' => $row->reference,
                         'account' => '506032',
@@ -106,13 +112,11 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'operation_unit' => 'OPR',
                         'debit' => 0,
                         'credit' => $row->cod_express_income ?? 0,
-                        'category' => $categoryName,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        //'category' => $categoryName,
                     ];
                     $insertData[] = [
-                        'journal' => $journalCode,
-                        'delivered_date' => $this->deliveredDate,
+                        'journal' => null,
+                        'delivered_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
                         'account' => '506030',
@@ -120,13 +124,11 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'operation_unit' => 'OPR',
                         'debit' => 0,
                         'credit' => $row->cod_income ?? 0,
-                        'category' => $categoryName,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        //'category' => $categoryName,
                     ];
                     $insertData[] = [
-                        'journal' => $journalCode,
-                        'delivered_date' => $this->deliveredDate,
+                        'journal' => null,
+                        'delivered_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
                         'account' => '355003',
@@ -134,24 +136,23 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'operation_unit' => 'OPR',
                         'debit' => 0,
                         'credit' => $row->cod_payable ?? 0,
-                        'category' => $categoryName,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        //'category' => $categoryName,
                     ];
                     $insertData[] = [
-                        'journal' => $journalCode,
-                        'delivered_date' => $this->deliveredDate,
+                        'journal' => null,
+                        'delivered_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
-                        'account' => 'Branch Cash ('.$row->reference.')',
+                        'account' => $row->journal,
                         'label' => 'COD Total',
                         'operation_unit' => 'OPR',
                         'debit' => $row->cod_total ?? 0,
                         'credit' => 0,
-                        'category' => $categoryName,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        //'category' => $categoryName,
                     ];
+
+                    // next rows no journal
+                    $isFirstRow = false; 
                 }
             }
 
@@ -184,8 +185,7 @@ class GenerateFinanceReportJob implements ShouldQueue
                 'operation_unit',
                 'debit',
                 'credit',
-                'category',
-                'created_at'
+                //'category',
             ]);
 
             foreach ($insertData as $row) {
@@ -199,8 +199,7 @@ class GenerateFinanceReportJob implements ShouldQueue
                     $row['operation_unit'],
                     $row['debit'],
                     $row['credit'],
-                    $row['category'],
-                    $row['created_at'],
+                    //$row['category'],
                 ]);
             }
 

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Mail;
 class ExportFileJob
 {
     protected string $yearMonth;
-    protected int $batchSize = 5000; // ✅ batch size for updating export_id
+    protected int $batchSize = 5000; // batch size for updating export_id
 
     public function __construct(?string $yearMonth = null)
     {
@@ -93,7 +93,8 @@ class ExportFileJob
                     confirm_date,
                     from_city,
                     to_city,
-                    service_type
+                    service_type,
+                    waybill_status
                 FROM upload_data PARTITION ({$partitionList})
                 WHERE refund = 0
                 ORDER BY id
@@ -120,7 +121,7 @@ class ExportFileJob
                 'Outbound Date','Accounting Date','Sender/Internal Reference','Sender/Display Name',
                 'Waybill No','From Analytic Account','To Analytic Account','Receiver Name',
                 'Weight','Total','Insurance Amount','COD Express Income','COD Income','COD Payable',
-                'Delivered Date','Confirm Date','From City','To City','Service Type'
+                'Delivered Date','Confirm Date','From City','To City','Service Type','Waybill Status'
             ]);
 
             $count = 0;
@@ -150,7 +151,8 @@ class ExportFileJob
                     $row->confirm_date,
                     $row->from_city,
                     $row->to_city,
-                    $row->service_type
+                    $row->service_type,
+                    $row->waybill_status
                 ]);
 
                 $rowIds[] = $row->id;
