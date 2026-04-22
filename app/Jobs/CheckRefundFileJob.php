@@ -94,7 +94,7 @@ class CheckRefundFileJob implements ShouldQueue
         ImportRefundFileJob::dispatch(
             $this->uploadId,
             $this->filePath
-        );
+        )->onQueue('import');
     }
 
     

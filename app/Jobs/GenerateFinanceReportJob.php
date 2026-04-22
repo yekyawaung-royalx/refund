@@ -99,15 +99,16 @@ class GenerateFinanceReportJob implements ShouldQueue
                 $isFirstRow = true;
 
                 foreach ($results as $row) {
-                    $journalValue = $isFirstRow ? $journalCode : null;
-                    $deliveredDate = $isFirstRow ? $this->deliveredDate : null;
+                    $journalValue   = $isFirstRow ? $journalCode : null;
+                    $deliveredDate  = $isFirstRow ? $this->deliveredDate : null;
+                    $codPayable     = $row->cod_payable ?? 0;
 
                     $insertData[] = [
                         'journal' => $journalValue,
                         'delivered_date' => $deliveredDate,
                         'ref' => null,
                         'analytic' => $row->reference,
-                        'account' => '506032',
+                        'account' => '506030',
                         'label' => 'COD Express Income Amount',
                         'operation_unit' => 'OPR',
                         'debit' => 0,
@@ -119,7 +120,7 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'delivered_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
-                        'account' => '506030',
+                        'account' => '506032',
                         'label' => 'COD Income Amount',
                         'operation_unit' => 'OPR',
                         'debit' => 0,
@@ -131,11 +132,11 @@ class GenerateFinanceReportJob implements ShouldQueue
                         'delivered_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
-                        'account' => '355003',
+                        'account' => $codPayable >= 0 ? '355003' : '272750', // 355003 for +, 272750 for -
                         'label' => 'COD Payable Amount',
                         'operation_unit' => 'OPR',
-                        'debit' => 0,
-                        'credit' => $row->cod_payable ?? 0,
+                        'debit' => $codPayable < 0 ? abs($codPayable) : 0, // Amount -
+                        'credit' => $codPayable >= 0 ? $codPayable : 0, // Amount +
                         //'category' => $categoryName,
                     ];
                     $insertData[] = [
