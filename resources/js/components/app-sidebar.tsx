@@ -19,19 +19,19 @@ const mainNavItems: NavItem[] = [
     {
         title: 'Refund Report',
         href: '/reporting',
-        permission: "",
+        permission: "refund-reports",
         icon: CalendarCheck,
     },
     {
         title: 'Finance Report',
         href: '/finance-report',
-        permission: "",
+        permission: "finance-reports",
         icon: CalendarCheck,
     },
     {
         title: 'Exported Files',
         href: '/exported-files',
-        permission: "",
+        permission: "exported-files",
         icon: FileInputIcon,
     },
 ];
@@ -40,7 +40,7 @@ const refundNavItems: NavItem[] = [
     {
         title: 'Refunds Dashboard',
         href: '/refunds',
-        permission: "upload-file",
+        permission: "",
         icon: MonitorIcon,
     },
     {
@@ -68,9 +68,10 @@ const BlogNavItems: NavItem[] = [
     {
         title: 'Users',
         icon: UserCircle,
+        permission: "users",
         children: [
             { 
-                title: 'Add Users', 
+                title: 'Add User', 
                 href: '/users/create', 
                 permission: "create-user", 
                 icon: BookOpen 
@@ -78,7 +79,7 @@ const BlogNavItems: NavItem[] = [
             { 
                 title: 'All Users', 
                 href: '/users', 
-                permission: "view-users", 
+                permission: "all-users", 
                 icon: BookOpen 
             },
         ],
@@ -86,17 +87,18 @@ const BlogNavItems: NavItem[] = [
     {
         title: 'Analytics Accounts',
         icon: FileUser,
+        permission: "analytics", 
         children: [
             { 
                 title: 'Add Account', 
                 href: '/analytics-accounts/create', 
-                permission: "create-user", 
+                permission: "create-analytics", 
                 icon: BookOpen 
             },
             { 
                 title: 'All Account', 
                 href: '/analytics-accounts', 
-                permission: "view-users", 
+                permission: "all-analytics", 
                 icon: BookOpen 
             },
         ],
@@ -104,13 +106,13 @@ const BlogNavItems: NavItem[] = [
     {
         title: 'Jobs',
         href: '/jobs',
-        permission: "job-alerts",
+        permission: "jobs",
         icon: HammerIcon,
     },
     {
         title: 'Schedulers',
         href: '/schedulers',
-        permission: "job-alerts",
+        permission: "schedulers",
         icon: AlarmCheckIcon,
     },
     {
@@ -122,7 +124,7 @@ const BlogNavItems: NavItem[] = [
     {
         title: 'Table Partitions',
         href: '/partitions',
-        permission: "table-partitions",
+        permission: "partitions",
         icon: PieChartIcon,
     },
 ];
@@ -134,11 +136,13 @@ const footerNavItems: NavItem[] = [
     {
         title: 'Logs',
         href: '/logs',
+        permission: "logs",
         icon: ScanSearchIcon,
     },
     {
         title: 'Developer Notes',
         href: '/notes',
+        permission: "notes",
         icon: BookOpen,
     },
 ];
@@ -147,13 +151,14 @@ const footerNavItems: NavItem[] = [
 const usePermission = () => {
   const { auth } = usePage().props as any;
   const permissions: string[] = auth?.permissions || [];
-
+console.log(auth.permissions);
   const can = (permission?: string) => {
     if (!permission) return true; // No permission required
     return permissions.includes(permission);
   };
 
   return { can };
+  
 };
 
 // Recursive menu filter based on permission
@@ -178,6 +183,7 @@ export function AppSidebar() {
   const filteredMain = filterMenu(mainNavItems, can);
   const filteredRefund = filterMenu(refundNavItems, can);
   const filteredAdmin = filterMenu(BlogNavItems, can);
+  const filtereFooter = filterMenu(footerNavItems, can);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -200,7 +206,7 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
+                <NavFooter items={filtereFooter} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

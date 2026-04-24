@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\User;
+use App\Models\UserPermission;
+use App\Models\Permission;
 use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
@@ -66,21 +68,80 @@ class UserController extends Controller
 
     public function view(Request $request, $id)
     {
-        $user = User::findOrFail($id);
-
-        // example: user permissions (if you store as array/json column)
-        //$permissions = $user->permissions ?? [];
-        // $permissions = DB::table('user_permissions')
-        //     ->where('user_id', $id)
-        //     ->pluck('permission')   // 👈 only permission column
-        //     ->toArray();
         $user = User::with('permissions')->findOrFail($id);
 
-        //return  $user->permissions->pluck('name');
+        $permissions = Permission::all()->groupBy('section');
 
         return inertia('users/view', [
             'user' => $user,
-            'userPermissions' => $user->permissions->pluck('name'),
+            'permissionSections' => $permissions->map(function ($items, $groupName) {
+                return [
+                    'section' => $groupName,
+                    'permissions' => $items->map(function ($p) {
+                        return [
+                            'label' => $p->label,
+                            'value' => $p->value,
+                        ];
+                    })->values(),
+                ];
+            })->values(),
+
+            'userPermissions' => $user->permissions
+                ->where('pivot.active', 1)
+                ->pluck('value')
+                ->toArray(),
         ]);
     }
+
+    public function update_permissions(Request $request, User $user)
+    {
+        $request->validate([
+            'permissions' => ['array'],
+            'permissions.*' => ['string'],
+        ]);
+
+        $selected = $request->permissions ?? [];
+
+        DB::transaction(function () use ($user, $selected) {
+
+            // 🔥 deactivate all first
+            UserPermission::where('user_id', $user->id)
+                ->update(['active' => 0]);
+
+            foreach ($selected as $permissionName) {
+
+                // permission table ကနေ id ရယူ (assume Permission model exists)
+                $permissionId = \App\Models\Permission::where('value', $permissionName)
+                    ->value('id');
+
+                if (!$permissionId) continue;
+
+                UserPermission::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'permission_id' => $permissionId,
+                    ],
+                    [
+                        'active' => 1
+                    ]
+                );
+            }
+        });
+
+        return back()->with('success', 'Permissions updated successfully');
+    }
+
+    public function update_avatar(Request $request)
+    {
+        $request->validate([
+            'profile' => 'required|string',
+        ]);
+
+        $user = $request->user();
+        $user->profile = $request->profile;
+        $user->save();
+
+        return back()->with('success', 'Avatar updated');
+    }
+
 }

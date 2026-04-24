@@ -28,7 +28,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 const roles = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
-  { value: "staff", label: "staff" },
+  { value: "norefund-staff", label: "Staff (Refund)" },
+  { value: "refund-staff", label: "Staff (No Refund)" },
 ];
 
 const statuses = [

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Head, router } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import AppLayout from "@/layouts/app-layout";
 import { type BreadcrumbItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 
-import { UploadCloud, Loader2, FileSpreadsheet, UploadIcon } from "lucide-react";
+import {
+  UploadCloud,
+  Loader2,
+  FileSpreadsheet,
+  UploadIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -24,20 +29,56 @@ const categories = [
   { value: "refund", label: "Refund (ငွေအမ်းပြီး)" },
 ];
 
-export default function UploadFile() {
-  const [category, setCategory] = React.useState("no-refund");
+// ✅ permission mapping (scalable)
+const permissionMap: Record<string, string> = {
+  "no-refund": "no-refund-upload",
+  refund: "refund-upload",
+};
 
+export default function UploadFile() {
+  const { auth } = usePage().props as any;
+
+  const hasPermission = (perm: string) =>
+    auth?.permissions?.includes(perm);
+
+  const [category, setCategory] = React.useState("");
+  const [title, setTitle] = React.useState("");
+
+  // ✅ memoized filter
+  const filteredCategories = React.useMemo(() => {
+    return categories.filter((c) =>
+      hasPermission(permissionMap[c.value])
+    );
+  }, [auth?.permissions]);
+
+  // ✅ fix invalid category automatically
+  React.useEffect(() => {
+    if (!filteredCategories.find((c) => c.value === category)) {
+      setCategory(filteredCategories[0]?.value || "");
+    }
+  }, [filteredCategories]);
+
+  // ✅ title generator (safe)
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+  const todayStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
   const getTitleFromCategory = (cat: string) => {
-    const catLabel = categories.find(c => c.value === cat)?.label ?? "No Refund";
-    const hyphenLabel = catLabel.split("(")[0].trim().replace(/\s+/g, "-");
+    const catLabel =
+      filteredCategories.find((c) => c.value === cat)?.label || "";
+
+    if (!catLabel) return "";
+
+    const hyphenLabel = catLabel
+      .split("(")[0]
+      .trim()
+      .replace(/\s+/g, "-");
+
     return `${todayStr}-${hyphenLabel}`;
   };
 
-  const [title, setTitle] = React.useState(getTitleFromCategory(category));
-  React.useEffect(() => setTitle(getTitleFromCategory(category)), [category]);
+  React.useEffect(() => {
+    setTitle(getTitleFromCategory(category));
+  }, [category]);
 
   const [file, setFile] = React.useState<File | null>(null);
   const [dragActive, setDragActive] = React.useState(false);
@@ -50,6 +91,7 @@ export default function UploadFile() {
   const validateFile = (file: File) => {
     const isCsvType = file.type === "text/csv";
     const isCsvExt = file.name.toLowerCase().endsWith(".csv");
+
     if (!isCsvType && !isCsvExt) {
       toast.error("Only CSV files are allowed.");
       return false;
@@ -59,17 +101,20 @@ export default function UploadFile() {
 
   const handleFile = (selected: File) => {
     if (!validateFile(selected)) return;
+
     const sizeMB = selected.size / 1024 / 1024;
     if (sizeMB > MAX_SIZE_MB) {
       toast.error(`File size exceeds ${MAX_SIZE_MB} MB.`);
       return;
     }
+
     setFile(selected);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
@@ -77,6 +122,12 @@ export default function UploadFile() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!category) {
+      toast.error("No category selected.");
+      return;
+    }
+
     if (!file) {
       toast.warning("Please select a file first.");
       return;
@@ -90,12 +141,14 @@ export default function UploadFile() {
       { title, category, file },
       {
         forceFormData: true,
-        onProgress: (event) => { if (event?.percentage) setProgress(event.percentage); },
+        onProgress: (event) => {
+          if (event?.percentage) setProgress(event.percentage);
+        },
         onSuccess: () => {
-          toast.success("Upload successful.File validation started. Please wait...");
-          setFile(null); 
-          //setTitle(""); 
-          //setCategory("");
+          toast.success(
+            "Upload successful. File validation started..."
+          );
+          setFile(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
           setProgress(0);
         },
@@ -112,7 +165,7 @@ export default function UploadFile() {
       <div className="p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-          {/* LEFT COLUMN - FORM */}
+          {/* LEFT */}
           <Card className="rounded-2xl shadow-md">
             <CardHeader>
               <CardTitle className="text-xl text-green-500 flex items-center gap-2">
@@ -124,111 +177,120 @@ export default function UploadFile() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
 
-                {/* Category as Radio Cards with visible radio button */}
-<div className="space-y-2">
-  <label className="text-sm font-medium">Category</label>
-  <div className="grid grid-cols-2 gap-4 mt-2">
-    {categories.map((c) => (
-      <label
-        key={c.value}
-        className={cn(
-            "cursor-pointer rounded-xl border p-4 flex items-start gap-3 transition shadow-sm",
-            category === c.value
-              ? "border-green-500 text-green-500 bg-green-100 dark:bg-gray-900 shadow-lg"
-              : "border-muted bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
-          )}
-      >
-        {/* Hidden radio input */}
-        <input
-          type="radio"
-          name="category"
-          value={c.value}
-          className="peer sr-only"
-          checked={category === c.value}
-          onChange={() => setCategory(c.value)}
-        />
+                {/* CATEGORY */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
 
-        {/* Circle indicator */}
-        <span
-          className={cn(
-            "w-5 h-5 rounded-full border flex-shrink-0 flex items-center justify-center transition",
-            category === c.value
-              ? "border-green-500 bg-green-500"
-              : "border-gray-300 bg-gray-300"
-          )}
-        >
-          {category === c.value ? (
-            <span className="w-2.5 h-2.5 rounded-full bg-white" />
-          ):(
-            <span className="w-2.5 h-2.5 rounded-full bg-white/50" />
-          )}
-        </span>
+                  {filteredCategories.length === 0 ? (
+                    <p className="text-sm text-red-500">
+                      You don’t have permission to upload files.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      {filteredCategories.map((c) => (
+                        <label
+                          key={c.value}
+                          className={cn(
+                            "cursor-pointer rounded-xl border p-4 flex items-start gap-3 transition shadow-sm",
+                            category === c.value
+                              ? "border-green-500 text-green-500 bg-green-100 dark:bg-gray-900 shadow-lg"
+                              : "border-muted bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="category"
+                            value={c.value}
+                            className="peer sr-only"
+                            checked={category === c.value}
+                            onChange={() => setCategory(c.value)}
+                          />
 
-        {/* Label content */}
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <span className="text-md font-semibold">{c.label.split("(")[0].trim()}</span>
-          </div>
-          <span className="text-sm text-muted-foreground mt-1">
-            {c.label.includes("(") ? c.label.split("(")[1].replace(")", "") : ""}
-          </span>
-        </div>
-      </label>
-    ))}
-  </div>
-</div>
+                          <span
+                            className={cn(
+                              "w-5 h-5 rounded-full border flex items-center justify-center",
+                              category === c.value
+                                ? "border-green-500 bg-green-500"
+                                : "border-gray-300 bg-gray-300"
+                            )}
+                          >
+                            {category === c.value && (
+                              <span className="w-2.5 h-2.5 bg-white rounded-full" />
+                            )}
+                          </span>
 
-                {/* Title */}
+                          <div>
+                            <div className="font-semibold">
+                              {c.label.split("(")[0].trim()}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {c.label.includes("(")
+                                ? c.label.split("(")[1].replace(")", "")
+                                : ""}
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* TITLE */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Title</label>
                   <Input
-                    placeholder="Enter title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                   />
                 </div>
 
-                {/* Drag & Drop */}
+                {/* DROPZONE */}
                 <div
-                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragActive(true);
+                  }}
                   onDragLeave={() => setDragActive(false)}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                   className={cn(
-                    "border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition",
-                    dragActive ? "border-green-500 bg-sky-50" : "border-gray-400 dark:border-gray-600"
+                    "border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer",
+                    dragActive
+                      ? "border-green-500 bg-sky-50"
+                      : "border-gray-400"
                   )}
                 >
-                  <UploadCloud className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Drag & Drop CSV here</p>
+                  <UploadCloud className="mx-auto mb-2" />
+                  <p className="text-sm">Drag & Drop CSV here</p>
+
                   {file && (
-                    <div className="mt-3 flex items-center justify-center gap-2 text-sm text-green-600">
+                    <div className="mt-2 text-green-600 flex justify-center gap-2">
                       <FileSpreadsheet className="h-4 w-4" />
                       {file.name}
                     </div>
                   )}
+
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept=".csv"
                     className="hidden"
-                    onChange={(e) => e.target.files && handleFile(e.target.files[0])}
+                    onChange={(e) =>
+                      e.target.files && handleFile(e.target.files[0])
+                    }
                   />
                 </div>
 
-                {/* Progress */}
-                {uploading && <Progress value={progress} className="h-2" />}
+                {uploading && <Progress value={progress} />}
 
-                {/* Submit */}
                 <Button
                   type="submit"
-                  disabled={uploading}
-                  className="w-full cursor-pointer bg-green-500 hover:bg-green-600 text-white"
+                  disabled={uploading || filteredCategories.length === 0}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white"
                 >
-                  <UploadIcon />
                   {uploading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="animate-spin mr-2" />
                       Uploading...
                     </>
                   ) : (
@@ -240,12 +302,13 @@ export default function UploadFile() {
             </CardContent>
           </Card>
 
-          {/* RIGHT COLUMN - MESSAGE */}
+          {/* RIGHT (unchanged) */}
           <Card className="rounded-2xl shadow-sm border border-muted">
             <CardHeader>
-              <CardTitle className="text-lg text-green-500">Instructions</CardTitle>
+              <CardTitle className="text-lg text-green-500">
+                Instructions
+              </CardTitle>
             </CardHeader>
-
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>Please upload a valid CSV file.</p>
               <ul className="list-disc pl-5 space-y-2">

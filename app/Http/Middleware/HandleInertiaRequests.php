@@ -46,7 +46,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
                 'permissions' => $request->user()
-                ? $request->user()->permissions->pluck('name')
+                ? $request->user()->permissions->pluck('value')
                 : [],
             ],
             'ziggy' => fn (): array => [

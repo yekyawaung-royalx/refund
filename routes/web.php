@@ -83,10 +83,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/users/create', [UserController::class, 'create']);
     Route::post('/users', [UserController::class, 'store']);
     Route::get('/users/{id}', [UserController::class, 'view']);
+    Route::patch('/profile/avatar', [UserController::class, 'update_avatar'])->name('profile.update-avatar');
     Route::get('/jobs', [RefundController::class, 'job_lists']);
     Route::get('/schedulers', [RefundController::class, 'scheduler_lists']);
     Route::delete('/refunds/uploaded-files/{id}', [UploadController::class, 'destroy']);
     Route::get('/reporting/search', [ReportingController::class, 'search']);
+    Route::post('/users/{user}/permissions', [UserController::class, 'update_permissions']);
 
     Route::get('/analytics-accounts', [AnalyticsController::class, 'analytics_accounts']);
     Route::get('/analytics-accounts/create', [AnalyticsController::class, 'create_analytics_accounts']);

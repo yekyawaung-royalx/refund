@@ -1,60 +1,101 @@
-import { useState } from 'react';
+import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { RadioGroup } from "@headlessui/react";
 import { Button } from "@/components/ui/button";
+import { router } from "@inertiajs/react";
+import HeadingSmall from "./heading-small";
+import { toast } from "sonner";
 
 const avatars = [
-  '/avatars/boy-01.png',
-  '/avatars/boy-02.png',
-  '/avatars/boy-03.png',
-  '/avatars/boy-04.png',
-  '/avatars/girl-01.png',
-  '/avatars/girl-02.png',
-  '/avatars/girl-03.png',
-  '/avatars/girl-04.png',
+  "boy-01.png",
+  "boy-02.png",
+  "boy-03.png",
+  "boy-04.png",
+  "boy-05.png",
+  "boy-06.png",
+  "boy-07.png",
+  "boy-08.png",
+  "boy-09.png",
+  "girl-01.png",
+  "girl-02.png",
+  "girl-03.png",
+  "girl-04.png",
+  "girl-05.png",
+  "girl-06.png",
+  "girl-07.png",
+  "girl-08.png",
+  "girl-09.png",
 ];
 
 export default function ProfileAvatar({ auth }: { auth: any }) {
-  const [selectedAvatar, setSelectedAvatar] = useState<string>(auth.user.avatar || avatars[0]);
+  const [selectedAvatar, setSelectedAvatar] = useState(
+    auth.user.profile || "girl-01.png"
+  );
+
+  const [loading, setLoading] = useState(false);
 
   const saveAvatar = () => {
-    // PATCH request to update user avatar
-    fetch(route('profile.update-avatar'), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')!,
+  setLoading(true);
+
+  const toastId = toast.loading("Updating avatar...");
+
+  router.patch(
+    route("profile.update-avatar"),
+    { profile: selectedAvatar },
+    {
+      preserveScroll: true,
+
+      onSuccess: () => {
+        toast.success("Avatar updated successfully!", {
+          id: toastId,
+        });
       },
-      body: JSON.stringify({ avatar: selectedAvatar }),
-    }).then(res => {
-      if (res.ok) {
-        alert('Avatar updated!');
-      }
-    });
-  };
+
+      onError: () => {
+        toast.error("Failed to update avatar", {
+          id: toastId,
+        });
+      },
+
+      onFinish: () => setLoading(false),
+    }
+  );
+};
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-medium">Choose your avatar</h3>
+      <HeadingSmall title="Avatar" description="Change your avatar" />
 
-      <RadioGroup value={selectedAvatar} onChange={setSelectedAvatar} className="grid grid-cols-4 gap-4">
-        {avatars.map((avatar) => (
-          <RadioGroup.Option key={avatar} value={avatar} className="cursor-pointer">
-            {({ checked }) => (
-              <div
-                className={`p-1 rounded-full border-2 ${checked ? 'border-blue-500' : 'border-transparent'}`}
-              >
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={avatar} />
-                  <AvatarFallback>U</AvatarFallback>
-                </Avatar>
-              </div>
-            )}
-          </RadioGroup.Option>
-        ))}
-      </RadioGroup>
+      <RadioGroup
+  value={selectedAvatar}
+  onChange={setSelectedAvatar}
+  className="grid grid-cols-6 gap-4"
+>
+  {avatars.map((avatar) => (
+    <RadioGroup.Option key={avatar} value={avatar} className="flex justify-start">
+      {({ checked }) => (
+        <div
+          className={`
+            p-1 rounded-full border-2 transition
+            ${checked ? "border-green-500" : "border-transparent hover:border-muted"}
+          `}
+        >
+          <Avatar className="w-14 h-14 rounded-full overflow-hidden">
+            <AvatarImage
+              src={`/avatars/${avatar}`}
+              className="object-cover w-full h-full"
+            />
+            <AvatarFallback>U</AvatarFallback>
+          </Avatar>
+        </div>
+      )}
+    </RadioGroup.Option>
+  ))}
+</RadioGroup>
 
-      <Button onClick={saveAvatar}>Save Avatar</Button>
+      <Button className="bg-green-500 hover:bg-green-600 text-white" onClick={saveAvatar} disabled={loading}>
+        {loading ? "Saving..." : "Save Avatar"}
+      </Button>
     </div>
   );
 }

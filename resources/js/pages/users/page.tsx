@@ -32,7 +32,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function UsersPage() {
-  const { users } = usePage().props as any;
+  const { users, auth } = usePage().props as any;
 
   const data = users?.data ?? [];
   const allColumns = data.length > 0 ? Object.keys(data[0]) : [];
@@ -153,6 +153,7 @@ export default function UsersPage() {
                           </Button>
 
                           {/* Edit */}
+                          {auth?.user?.role === "admin" ? (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -162,8 +163,10 @@ export default function UsersPage() {
                             <Pencil className="h-4 w-4" />
                             Edit
                           </Button>
+                          ) : null}
 
                           {/* Delete */}
+                          {auth?.user?.role === "admin" ? (
                           <Button
                             size="sm"
                             variant="destructive"
@@ -171,8 +174,9 @@ export default function UsersPage() {
                             className="flex items-center gap-1"
                           >
                             <Trash2 className="h-4 w-4" />
-                            Delete
+                            Delete 
                           </Button>
+                          ) : null}
 
                         </div>
                       </TableCell>
