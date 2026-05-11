@@ -137,7 +137,7 @@ class RefundController extends Controller
 
         // Category filter
         if ($category === 'no-refund') {
-            $query->whereNotNull('norefund_upload_id');
+            $query->whereNotNull('norefund_id');
         }
 
         if ($category === 'refund') {

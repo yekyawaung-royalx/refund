@@ -204,7 +204,7 @@ class UploadController extends Controller
     public function recent_uploaded_data()
     {
         $recent_uploaded_data = DB::table('upload_data')
-            ->select('date','customer_reference_no','customer','waybill_no','from_city','to_city','receiver_name','refund','created_at')
+            ->select('outbound_date','customer_reference_no','customer','waybill_no','from_city','to_city','receiver_name','refund','created_at')
             ->orderBy('id', 'desc')
             ->limit(10)
             ->get();
