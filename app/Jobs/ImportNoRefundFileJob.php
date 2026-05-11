@@ -15,7 +15,7 @@ use App\Jobs\AutoCheckAnalyticBranchJob;
 class ImportNoRefundFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
+    protected string $username;
     protected int $uploadId;
     protected string $filePath;
     protected int $batchSize = 1500; //1500 × 33 columns = 49,500,(MySQL default 65,535 limit)
@@ -23,10 +23,11 @@ class ImportNoRefundFileJob implements ShouldQueue
     public $timeout = 3600;
     public $tries = 3;
 
-    public function __construct(int $uploadId, string $filePath)
+    public function __construct(int $uploadId, string $filePath, string $username)
     {
         $this->uploadId = $uploadId;
         $this->filePath = $filePath;
+        $this->username = $username;
     }
 
     public function handle()
@@ -148,6 +149,16 @@ class ImportNoRefundFileJob implements ShouldQueue
                 'failed_rows' => $failed,
                 'status' => 'completed',
                 'processed_duration' => $duration,
+            ]);
+
+            // saved user action logs
+            DB::table('action_logs')->insert([
+                'action'     => 'IMPORT',
+                'keywords'   => 'NO_REFUND',
+                'user'       => $this->username,
+                'log'        => "Import completed successfully. Upload ID: {$this->uploadId}, Total Rows: {$totalRows}, Success: {$processed}, Failed: {$failed}",
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             AutoCheckAnalyticBranchJob::dispatch($this->uploadId);

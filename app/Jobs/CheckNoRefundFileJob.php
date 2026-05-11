@@ -15,7 +15,7 @@ use Carbon\Carbon;
 class CheckNoRefundFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
+    protected string $username;
     protected int $uploadId;
     protected string $filePath;
 
@@ -25,10 +25,11 @@ class CheckNoRefundFileJob implements ShouldQueue
     protected int $expectedColumns = 33;
     protected int $dbChunkSize = 1000;
 
-    public function __construct(int $uploadId, string $filePath)
+    public function __construct(int $uploadId, string $filePath, string $username)
     {
         $this->uploadId = $uploadId;
         $this->filePath = $filePath;
+        $this->username = $username;
     }
 
     public function handle()
@@ -219,7 +220,8 @@ class CheckNoRefundFileJob implements ShouldQueue
 
             ImportNoRefundFileJob::dispatch(
                 $this->uploadId, 
-                $this->filePath
+                $this->filePath,
+                $this->username
             )->onQueue('import');
 
         } catch (\Throwable $e) {

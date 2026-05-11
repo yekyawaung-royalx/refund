@@ -21,6 +21,7 @@ import {
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Dashboard", href: "/dashboard" },
   { title: "Finance Report", href: "/finance-report" },
+  { title: "Branches Deposit", href: "/finance-report/branches-deposit" },
   { title: "View File", href: "#" },
 ];
 

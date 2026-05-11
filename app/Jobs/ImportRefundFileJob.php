@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 class ImportRefundFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
+    protected string $username;
     protected int $uploadId;
     protected string $filePath;
 
@@ -22,10 +22,11 @@ class ImportRefundFileJob implements ShouldQueue
     public $tries = 3;
     protected int $batchSize = 1000;
 
-    public function __construct(int $uploadId, string $filePath)
+    public function __construct(int $uploadId, string $filePath, string $username)
     {
         $this->uploadId = $uploadId;
         $this->filePath = $filePath;
+        $this->username = $username;
     }
 
     public function handle()
@@ -86,6 +87,7 @@ class ImportRefundFileJob implements ShouldQueue
             $file->fgetcsv(); // skip header
 
             $batch = [];
+            
 
             while (!$file->eof()) {
                 $row = $file->fgetcsv();
@@ -95,6 +97,19 @@ class ImportRefundFileJob implements ShouldQueue
                     $amountRaw = $row[0] ?? null;
                     $paymentDateRaw = $row[2] ?? null;
                     $waybillNo = $row[5] ?? null;
+                    $vendorTypeRaw = $row[6] ?? null;
+
+                    $vendorType = null;
+                    
+                    if ($vendorTypeRaw) {
+                        $v = strtolower(trim($vendorTypeRaw));
+
+                        if ($v === 'invoice') {
+                            $vendorType = 'Invoice';
+                        } elseif ($v === 'vendor') {
+                            $vendorType = 'Vendor';
+                        }
+                    }
 
                     // ---------------- DATE NORMALIZE ----------------
                     $paymentDate = null;
@@ -121,8 +136,9 @@ class ImportRefundFileJob implements ShouldQueue
                     }
 
                     $batch[] = [
-                        'waybill_no' => $waybillNo,
-                        'payment_date' => $paymentDate
+                        'waybill_no'    => $waybillNo,
+                        'payment_date'  => $paymentDate,
+                        'vendor_type'   => $vendorType
                     ];
 
                     if (count($batch) >= $this->batchSize) {
@@ -185,6 +201,16 @@ class ImportRefundFileJob implements ShouldQueue
                 'failed_rows' => $failed,
                 'processed_duration' => $duration,
                 'failed_path' => $failedPath
+            ]);
+
+            // saved user action logs
+            DB::table('action_logs')->insert([
+                'action'     => 'IMPORT',
+                'keywords'   => 'REFUND',
+                'user'       => $this->username,
+                'log'        => "Import completed successfully. Upload ID: {$this->uploadId}, Total Rows: {$totalRows}, Success: {$processed}, Failed: {$failed}",
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             Log::info('Refund import completed', [
@@ -250,11 +276,16 @@ class ImportRefundFileJob implements ShouldQueue
         DB::statement("
             CREATE TEMPORARY TABLE $tempTable (
                 waybill_no VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PRIMARY KEY,
-                payment_date DATE
+                payment_date DATE,
+                vendor_type ENUM('Invoice','Vendor') NULL
             )
         ");
 
-        $insertData = array_map(fn($row) => ['waybill_no'=>$row['waybill_no'],'payment_date'=>$row['payment_date']], $rows);
+        $insertData = array_map(fn($row) => [
+            'waybill_no'=>$row['waybill_no'],
+            'payment_date'=>$row['payment_date'],
+            'vendor_type'  => $row['vendor_type']
+        ],$rows);
         DB::table($tempTable)->insert($insertData);
 
         try {
@@ -264,7 +295,8 @@ class ImportRefundFileJob implements ShouldQueue
                 SET
                     u.refund = 1,
                     u.refund_id = ?,
-                    u.payment_date = t.payment_date
+                    u.payment_date = t.payment_date,
+                    u.vendor_type = t.vendor_type
                 WHERE u.refund = 0
             ", [$this->uploadId]);
         } catch (\Throwable $e) {

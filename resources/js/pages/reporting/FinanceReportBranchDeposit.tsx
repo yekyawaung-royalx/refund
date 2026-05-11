@@ -3,6 +3,7 @@
 import * as React from "react";
 import { format } from "date-fns";
 import AppLayout from "@/layouts/app-layout";
+import { type BreadcrumbItem } from "@/types";
 import { Head, usePage} from "@inertiajs/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,12 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner"; 
 import { Badge } from "@/components/ui/badge";
+
+const breadcrumbs: BreadcrumbItem[] = [
+  { title: "Dashboard", href: "/dashboard" },
+  { title: "Finance Report", href: "/reports" },
+  { title: "Branches Bank Deposit", href: "#" },
+];
 
 // --- Types ---
 type Branch = {
@@ -116,7 +123,7 @@ function CommandSelect({
 }
 
 // --- Main Component ---
-export default function FinanceReport() {
+export default function FinanceReportBranchDeposit() {
   const { branches } = usePage().props as { branches: Branch[] };
 
   const [date, setDate] = React.useState<Date | undefined>(new Date());
@@ -149,7 +156,7 @@ export default function FinanceReport() {
   const fetchFiles = async (page: number = 1) => {
     try {
       setLoading(true);
-      const res = await fetch(`/finance-report/exported-files?page=${page}`);
+      const res = await fetch(`/finance-report/branches-deposit/exported-files?page=${page}`);
       const data: PaginatedResponse = await res.json();
 
       setFiles(data.data);
@@ -177,7 +184,7 @@ export default function FinanceReport() {
   };
 
   const handleDownload = (id: number) => {
-    window.open(`/finance-report/exported-files/${id}/download`, "_blank");
+    window.open(`/finance-report/branches-deposit/exported-files/${id}/download`, "_blank");
   };
 
   // --- Export Handler ---
@@ -189,7 +196,7 @@ export default function FinanceReport() {
         category: category !== "ALL" ? category! : "",
       }).toString();
 
-      const response = await fetch(`/finance-report/export?${query}`, {
+      const response = await fetch(`/finance-report/branches-deposit/export?${query}`, {
         method: "GET",
       });
 
@@ -207,15 +214,18 @@ export default function FinanceReport() {
   };
 
   return (
-    <AppLayout>
+    <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Finance Report" />
-
       <div className="p-4 space-y-4">
 
         {/* --- Form --- */}
         <Card>
           <CardHeader>
-            <CardTitle>Finance Report Form</CardTitle>
+            <CardTitle>Finance Report Branches Bank Deposit (
+              <span className="text-green-500 font-light">CODPL</span>,  
+              <span className="text-green-500 font-light">CODRN</span>, 
+              <span className="text-green-500 font-light">CODRT</span>, 
+              <span className="text-green-500 font-light">CODZR</span>)</CardTitle>
           </CardHeader>
 
           <CardContent>
@@ -262,7 +272,7 @@ export default function FinanceReport() {
         {/* --- Table --- */}
         <Card>
           <CardHeader>
-            <CardTitle>Exported Finance Reports</CardTitle>
+            <CardTitle>Exported Finance Branches Bank Deposit Reports</CardTitle>
           </CardHeader>
 
           <CardContent className="overflow-x">
@@ -324,7 +334,7 @@ export default function FinanceReport() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.location.href = `/finance-report/exported-files/${file.id}`}
+                          onClick={() => window.location.href = `/finance-report/branches-deposit/exported-files/${file.id}`}
                         >
                           <EyeIcon className="h-4 w-4" />
                         </Button>

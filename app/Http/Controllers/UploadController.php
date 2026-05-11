@@ -55,9 +55,9 @@ class UploadController extends Controller
 
         // Dispatch job based on category 
         if ($request->category === 'refund') { 
-            CheckRefundFileJob::dispatch($upload->id, $absolutePath); 
+            CheckRefundFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name); 
         } else { 
-            CheckNoRefundFileJob::dispatch($upload->id, $absolutePath); 
+            CheckNoRefundFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name); 
         }
 
         return redirect()

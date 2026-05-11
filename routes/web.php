@@ -98,13 +98,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/recent-exported-files', [UploadController::class, 'recent_exported_files']);
     Route::get('/recent-uploaded-data', [UploadController::class, 'recent_uploaded_data']);
     Route::get('/recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
-    Route::get('/finance-report', [ReportingController::class, 'finance_report']);
-    Route::get('/finance-report/export', [ReportingController::class, 'export']);
-    Route::get('/finance-report/generate', [ReportingController::class, 'generate']);
-    Route::get('/finance-report/exported-files', [ReportingController::class, 'finance_exported_files']);
-    Route::get('/finance-report/exported-files/{id}', [ReportingController::class, 'view_finance_exported_files']);
-    Route::get('/finance-report/exported-files/{id}/download',[ReportingController::class, 'download_exported_file']);  
-
+    
+    
+    /* Finance Report Routes */
+    Route::get('/finance-report/branches-deposit', [ReportingController::class, 'finance_report_branches_deposit']);
+    Route::get('/finance-report/branches-deposit/export', [ReportingController::class, 'branches_deposit_export']);
+    //Route::get('/finance-report/branches-deposit/generate', [ReportingController::class, 'branches_deposit_generate']);
+    Route::get('/finance-report/branches-deposit/exported-files', [ReportingController::class, 'finance_exported_branches_deposit_files']);
+    Route::get('/finance-report/branches-deposit/exported-files/{id}', [ReportingController::class, 'view_finance_exported_branches_deposit_files']);
+    Route::get('/finance-report/branches-deposit/exported-files/{id}/download',[ReportingController::class, 'download_exported_branches_deposit_file']);  
+    Route::get('/finance-report/cod-refund', [ReportingController::class, 'finance_report_cod_refund']);
+    Route::get('/finance-report/cod-refund/export', [ReportingController::class, 'cod_refund_export']);
+    
     Route::get('/notes', [NoteController::class, 'notes']);
     Route::get('/notes/laravel-queue', [NoteController::class, 'laravel_queue']);
     Route::get('/notes/laravel-production', [NoteController::class, 'laravel_production']);

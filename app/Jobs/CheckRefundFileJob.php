@@ -12,16 +12,17 @@ use Illuminate\Queue\SerializesModels;
 class CheckRefundFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
+    protected string $username;
     protected int $uploadId;
     protected string $filePath;
 
     protected int $expectedColumns = 7;
 
-    public function __construct(int $uploadId, string $filePath)
+    public function __construct(int $uploadId, string $filePath, string $username)
     {
         $this->uploadId = $uploadId;
         $this->filePath = $filePath;
+        $this->username = $username;
     }
 
     public function handle()
@@ -93,9 +94,8 @@ class CheckRefundFileJob implements ShouldQueue
 
         ImportRefundFileJob::dispatch(
             $this->uploadId,
-            $this->filePath
+            $this->filePath,
+            $this->username
         )->onQueue('import');
     }
-
-    
 }

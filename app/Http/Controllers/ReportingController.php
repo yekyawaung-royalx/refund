@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Carbon\Carbon;
 use App\Jobs\GenerateFinanceReportJob;
+use App\Jobs\GenerateFinanceCodRefundJob;
 use App\Models\FinanceExport;
 use Auth;
 
@@ -91,7 +92,7 @@ class ReportingController extends Controller
         ]);
     }
 
-    public function generate(Request $request)
+    public function branches_deposit_generate(Request $request)
     {
         // -------------------------
         // Validate input
@@ -101,13 +102,13 @@ class ReportingController extends Controller
         //     'branch' => ['nullable', 'string'],
         // ]);
 
-        $deliveredDate = '2026-03-09'; //$validated['delivered_date'];
-        $branch = ""; //$validated['branch'] ?? null;
+        $deliveredDate = $validated['delivered_date'];
+        $branch = $validated['branch'] ?? null;
 
         // -------------------------
         // Dispatch Job (Queue)
         // -------------------------
-        GenerateFinanceReportJob::dispatch($deliveredDate, $branch);
+        GenerateFinanceReportJob::dispatch($deliveredDate, $branch,  auth()->user()->name);
 
         // -------------------------
         // Response
@@ -123,19 +124,27 @@ class ReportingController extends Controller
     }
 
     
-     public function finance_report(Request $request)
+    public function finance_report_branches_deposit(Request $request)
     {
         $branches = DB::table('analytics')->where('journal','!=','')->get();
 
-        return Inertia::render('reporting/FinanceReport', [
+        return Inertia::render('reporting/FinanceReportBranchDeposit', [
             'branches' => $branches
         ]);
     }
 
-    public function export(Request $request)
+    public function finance_report_cod_refund(Request $request)
+    {
+        $branches = DB::table('analytics')->where('journal','!=','')->get();
+
+        return Inertia::render('reporting/FinanceReportCodRefund', [
+            'branches' => $branches
+        ]);
+    }
+
+    public function branches_deposit_export(Request $request)
     {
         // GET query parameters
-        $user = auth()->user()->name;
         $deliveredDate = $request->query('delivered_date');
         $destinationBranch = $request->query('destination_branch');
         $category = $request->query('category');
@@ -144,7 +153,7 @@ class ReportingController extends Controller
         // Dispatch Job (Queue)
         // -------------------------
         // Category: all,cod-payable,cod-not-collect,cod-to-collect,cod-zero
-        GenerateFinanceReportJob::dispatch($deliveredDate, $destinationBranch, $category, $user);
+        GenerateFinanceReportJob::dispatch($deliveredDate, $destinationBranch, $category, $user = auth()->user()->name);
 
         // -------------------------
         // Response
@@ -159,14 +168,38 @@ class ReportingController extends Controller
         ]);
     }
 
-     public function finance_exported_files(Request $request)
+    public function cod_refund_export(Request $request)
+    {
+        // GET query parameters
+        $paymentDate = $request->query('payment_date');
+        $category = $request->query('category');
+
+        // -------------------------
+        // Dispatch Job (Queue)
+        // -------------------------
+        // Category: all,cod-payable,cod-not-collect,cod-to-collect,cod-zero
+        GenerateFinanceCodRefundJob::dispatch($paymentDate, $category, auth()->user()->name);
+
+        // -------------------------
+        // Response
+        // -------------------------
+        return response()->json([
+            'status' => 'queued',
+            'message' => 'Finance report job is processing in background',
+            'data' => [
+                'payment_date' => $paymentDate,
+            ]
+        ]);
+    }
+
+     public function finance_exported_branches_deposit_files(Request $request)
     {
         $files = DB::table('finance_exports')->orderBy('id','desc')->paginate(20);
 
         return response()->json($files);
     }
 
-    public function view_finance_exported_files($id)
+    public function view_finance_exported_branches_deposit_files($id)
     {
         $export = FinanceExport::findOrFail($id);
 
@@ -209,7 +242,7 @@ class ReportingController extends Controller
         ]);
     }
 
-    public function download_exported_file($id)
+    public function download_exported_branches_deposit_file($id)
     {
         $export = DB::table('finance_exports')->where('id', $id)->first();
 

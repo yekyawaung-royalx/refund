@@ -13,7 +13,6 @@ use Illuminate\Queue\SerializesModels;
 class GenerateFinanceReportJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
     protected string $deliveredDate;
     protected ?string $branch;
     protected ?string $category; // all,cod-payable,cod-not-collect,cod-to-collect,cod-zero
@@ -158,6 +157,16 @@ class GenerateFinanceReportJob implements ShouldQueue
             }
 
             if (empty($insertData)) {
+                // saved user action logs
+                DB::table('action_logs')->insert([
+                    'action'     => 'EXPORT',
+                    'keywords'   => 'BRANCH_BANK_DEPOSIT',
+                    'user'       => $this->exportedBy,
+                    'log'        => "No data found for {$this->deliveredDate}",
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
                 Log::info("No data found for {$this->deliveredDate}");
                 return;
             }
@@ -167,7 +176,7 @@ class GenerateFinanceReportJob implements ShouldQueue
             // -----------------------------
             $folder = now()->format('Y-m');
             $timestamp = now()->format('Ymd_His');
-            $fileName = "finance-report-{$this->deliveredDate}-{$timestamp}.csv";
+            $fileName = "branches-depoit-{$this->deliveredDate}-{$timestamp}.csv";
             $relativePath = "private/finance-reports/{$folder}/{$fileName}";
 
             $directory = storage_path("app/private/finance-reports/{$folder}");
@@ -213,6 +222,7 @@ class GenerateFinanceReportJob implements ShouldQueue
                 'filename' => $fileName,
                 'filepath' => $relativePath,
                 'report_date' => $this->deliveredDate,
+                'report_type' => 'branches-deposit',
                 'category' => $this->category,
                 'filtered' => $this->branch ?? 'ALL',
                 'total_rows' => count($insertData),
@@ -246,8 +256,22 @@ class GenerateFinanceReportJob implements ShouldQueue
                 }
             }
 
-            Log::info("Finance report generated for {$this->deliveredDate} with finance_export ID {$financeExportId}");
+            // saved user action logs
+            DB::table('action_logs')->insert([
+                'action'     => 'EXPORT',
+                'keywords'   => 'BRANCH_BANK_DEPOSIT',
+                'user'       => $this->exportedBy,
+                'log'        => "Branch Bank Deposit report generated. Delivered Date: {$this->deliveredDate}, Exported File Name: {$fileName}, Row Count: " . count($insertData),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
+            Log::info(
+                "Branch Bank Deposit Report Generated | " .
+                "Delivered Date: {$this->deliveredDate} | " .
+                "Exported File Name: {$fileName} | " .
+                "Row Count: " . count($insertData)
+            );
         } catch (\Throwable $e) {
             Log::error("Finance report job failed: " . $e->getMessage());
             throw $e;

@@ -6,7 +6,7 @@ import { NavBlog } from '@/components/nav-blog';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from "@inertiajs/react";
-import { ActivityIcon, AlarmCheckIcon, BookOpen, CalendarCheck, Database, FileInputIcon, FilesIcon, FileUser, HammerIcon, LayoutGrid, MonitorIcon, PieChartIcon, ScanSearchIcon, UploadIcon, UserCircle } from 'lucide-react';
+import { ActivityIcon, AlarmCheckIcon, BookOpen, CalendarCheck, Database, FileInput, FileInputIcon, FilesIcon, FileUser, FolderInput, HammerIcon, LayoutGrid, MonitorIcon, PieChartIcon, ScanSearchIcon, UploadIcon, UserCircle } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -20,13 +20,27 @@ const mainNavItems: NavItem[] = [
         title: 'Refund Report',
         href: '/reporting',
         permission: "refund-reports",
-        icon: CalendarCheck,
+        icon: FolderInput,
     },
     {
         title: 'Finance Report',
         href: '/finance-report',
         permission: "finance-reports",
-        icon: CalendarCheck,
+        icon: FolderInput,
+        children: [
+            { 
+                title: 'Branches Bank Deposit', 
+                href: '/finance-report/branches-deposit', 
+                permission: "finance-reports", 
+                icon: FileInput 
+            },
+            { 
+                title: 'COD Refund', 
+                href: '/finance-report/cod-refund', 
+                permission: "finance-reports", 
+                icon: FileInput 
+            },
+        ],
     },
     {
         title: 'Exported Files',
