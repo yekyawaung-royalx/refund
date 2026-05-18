@@ -10,7 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class GenerateFinanceReportJob implements ShouldQueue
+class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
     protected string $deliveredDate;
@@ -74,7 +74,7 @@ class GenerateFinanceReportJob implements ShouldQueue
                     ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
                     ->whereDate('u.delivered_date', $this->deliveredDate)
                     ->whereNotNull('a.journal')
-                    ->where('u.finance_export', 0);
+                    ->where('u.branch_bank_deposit_export', 0);
 
                 if ($this->branch && $this->branch !== 'ALL') {
                     $query->where('u.destination_branch', $this->branch);
@@ -252,7 +252,7 @@ class GenerateFinanceReportJob implements ShouldQueue
                 if (!empty($uploadIds)) {
                     DB::table('upload_data')
                         ->whereIn('id', $uploadIds)
-                        ->update(['finance_export' => $financeExportId]);
+                        ->update(['branch_bank_deposit_export' => $financeExportId]);
                 }
             }
 

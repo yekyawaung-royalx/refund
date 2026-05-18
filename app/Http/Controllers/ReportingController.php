@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Carbon\Carbon;
-use App\Jobs\GenerateFinanceReportJob;
+use App\Jobs\GenerateFinanceBranchBankDepositJob;
 use App\Jobs\GenerateFinanceCodRefundJob;
 use App\Models\FinanceExport;
 use Auth;
@@ -59,38 +59,75 @@ class ReportingController extends Controller
     public function search(Request $request)
     {
         $startTime = microtime(true);
-        $date = $request->date; // 2026-02-01
 
-        // Generate partition name
-        $partition = 'P' . Carbon::parse($date)->format('Ym'); // p202602
+        $date = $request->query('date')
+            ? Carbon::parse($request->query('date'))->startOfDay()
+            : now()->startOfDay();
 
-        // $data = DB::select("
-        //     SELECT *
-        //     FROM upload_data PARTITION ($partition)
-        //     WHERE DATE(delivered_date) = ?
-        // ", [$date]);
+        $endDate = $date->copy()->endOfDay();
 
-        $data = DB::select("
-            SELECT *
-            FROM upload_data PARTITION ($partition)
-            WHERE DATE(delivered_date) = ?
-        ", [$date]);
+        // Partition name
+        $partition = 'P' . $date->format('Ym');
 
-        //$count = $countResult[0]->total ?? 0;
-        
+        $query = DB::table(DB::raw("upload_data PARTITION ($partition)"))
+            ->where('delivered_date', '>=', $date)
+            ->where('delivered_date', '<=', $endDate);
+
+        $results = $query
+            ->orderByDesc('delivered_date')
+            ->paginate(200)
+            ->withQueryString();
 
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 
-        //return $count;
-        //print_r($data); //$data;
+
         return response()->json([
             'partition_scanned' => $partition,
-            'date' => $date,
-            'count' => count($data),
-            'data' => $data,
+            'date' => $date->toDateString(),
+            'count' => 0,
+            'data' => $results,
             'execution_time_ms' => $executionTimeMs,
         ]);
+
+        // return Inertia::render('search/UploadedData', [
+        //     'execution_time_ms' => $executionTimeMs,
+        //     'partition_scanned' => $partition,
+        //     'data' => $results,
+        //     'count' => 0,
+        //     'date' => $date->toDateString(),
+        // ]);
     }
+
+    // public function search(Request $request)
+    // {
+    //     $startTime = microtime(true);
+    //     $date = $request->date; // 2026-02-01
+
+    //     // Generate partition name
+    //     $partition = 'P' . Carbon::parse($date)->format('Ym'); // p202602
+
+    //     $data = DB::select("
+    //         SELECT *
+    //         FROM upload_data PARTITION ($partition)
+    //         WHERE DATE(delivered_date) = ?
+    //     ", [$date]);
+
+    //     //$count = $countResult[0]->total ?? 0;
+        
+
+    //     $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+
+    //     //return $count;
+    //     //print_r($data); //$data;
+    //     return $data;
+    //     return response()->json([
+    //         'partition_scanned' => $partition,
+    //         'date' => $date,
+    //         'count' => count($data),
+    //         'data' => $data,
+    //         'execution_time_ms' => $executionTimeMs,
+    //     ]);
+    // }
 
     public function branches_deposit_generate(Request $request)
     {
@@ -108,7 +145,7 @@ class ReportingController extends Controller
         // -------------------------
         // Dispatch Job (Queue)
         // -------------------------
-        GenerateFinanceReportJob::dispatch($deliveredDate, $branch,  auth()->user()->name);
+        GenerateFinanceBranchBankDepositJob::dispatch($deliveredDate, $branch,  auth()->user()->name);
 
         // -------------------------
         // Response
@@ -153,7 +190,7 @@ class ReportingController extends Controller
         // Dispatch Job (Queue)
         // -------------------------
         // Category: all,cod-payable,cod-not-collect,cod-to-collect,cod-zero
-        GenerateFinanceReportJob::dispatch($deliveredDate, $destinationBranch, $category, $user = auth()->user()->name);
+        GenerateFinanceBranchBankDepositJob::dispatch($deliveredDate, $destinationBranch, $category, $user = auth()->user()->name);
 
         // -------------------------
         // Response
@@ -192,9 +229,16 @@ class ReportingController extends Controller
         ]);
     }
 
-     public function finance_exported_branches_deposit_files(Request $request)
+    public function finance_exported_branches_deposit_files(Request $request)
     {
-        $files = DB::table('finance_exports')->orderBy('id','desc')->paginate(20);
+        $files = DB::table('finance_exports')->where('report_type','branches-deposit')->orderBy('id','desc')->paginate(20);
+
+        return response()->json($files);
+    }
+
+    public function finance_report_cod_refund_files(Request $request)
+    {
+        $files = DB::table('finance_exports')->where('report_type','cod-refund')->orderBy('id','desc')->paginate(20);
 
         return response()->json($files);
     }

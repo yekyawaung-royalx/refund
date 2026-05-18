@@ -196,6 +196,9 @@ export default function UploadedData() {
                           </CardTitle>
 
             <div className="basis-3/5 flex justify-end items-center gap-2 flex-wrap">
+            // Vendor Type
+            // Refund Type
+            
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -228,56 +231,56 @@ export default function UploadedData() {
 
               <DateRangePicker value={dateRange} onChange={setDateRange} />
               <Popover>
-  <PopoverTrigger asChild>
-    <Button
-      variant="outline"
-      className="w-[120px] justify-between flex items-center"
-    >
-      <span>Actions</span>
-      <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
-    </Button>
-  </PopoverTrigger>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-[120px] justify-between flex items-center"
+                >
+                  <span>Actions</span>
+                  <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
+                </Button>
+              </PopoverTrigger>
 
-  <PopoverContent className="w-[120px] p-0">
-    <Command>
-      <CommandGroup>
-        <CommandItem 
-          className="justify-start"
-          onSelect={() => {
-            // Search action
-            const params: Record<string, string> = {};
-            if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
-            if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
-            params.category = selectedCategory as string;
+              <PopoverContent className="w-[120px] p-0">
+                <Command>
+                  <CommandGroup>
+                    <CommandItem 
+                      className="justify-start"
+                      onSelect={() => {
+                        // Search action
+                        const params: Record<string, string> = {};
+                        if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
+                        if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
+                        params.category = selectedCategory as string;
 
-            router.visit("/refunds/uploaded-data", { method: "get", data: params });
-          }}
-        >
-          <Search className="mr-2 h-4 w-4" />
-          Search
-        </CommandItem>
+                        router.visit("/refunds/uploaded-data", { method: "get", data: params });
+                      }}
+                    >
+                      <Search className="mr-2 h-4 w-4" />
+                      Search
+                    </CommandItem>
 
-        <CommandItem
-          onSelect={() => {
-            // Download action
-            const params: Record<string, string> = {};
-            if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
-            if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
-            params.category = selectedCategory as string;
-            const queryString = new URLSearchParams(params).toString();
+                    <CommandItem
+                      onSelect={() => {
+                        // Download action
+                        const params: Record<string, string> = {};
+                        if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
+                        if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
+                        params.category = selectedCategory as string;
+                        const queryString = new URLSearchParams(params).toString();
 
-            window.location.href = `/refunds/uploaded-data/download?${queryString}`;
+                        window.location.href = `/refunds/uploaded-data/download?${queryString}`;
 
-            toast.success("CSV export started! Check your downloads folder.");
-          }}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Download
-        </CommandItem>
-      </CommandGroup>
-    </Command>
-  </PopoverContent>
-</Popover>
+                        toast.success("CSV export started! Check your downloads folder.");
+                      }}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </CommandItem>
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
               {/* Column Dropdown */}
               <Popover open={columnsPopoverOpen} onOpenChange={setColumnsPopoverOpen}>

@@ -180,18 +180,19 @@ class ImportRefundFileJob implements ShouldQueue
             $failedPath = null;
             if (!empty($failedRows)) {
                 $folder = now()->format('Y-m');
-                $directory = storage_path("app/private/refund-failed/{$folder}");
+                $directory = storage_path("app/private/upload-failed/{$folder}");
                 if (!is_dir($directory)) mkdir($directory, 0755, true);
 
-                $fileName = "failed_{$this->uploadId}_" . time() . ".csv";
-                $fullPath = "{$directory}/{$fileName}";
+                $fileName = "failed_{$this->uploadId}_refunded_" . time() . ".csv";
+                $failedFilePath = "{$directory}/{$fileName}";
+                $failedRelativePath = "upload-failed/{$folder}/{$fileName}";
 
-                $handle = fopen($fullPath, 'w');
+                $handle = fopen($failedFilePath, 'w');
                 fputcsv($handle, ['file_id', 'waybill_no', 'failed_reason']);
                 foreach ($failedRows as $row) fputcsv($handle, [$row['file_id'], $row['waybill_no'], $row['reason']]);
                 fclose($handle);
 
-                $failedPath = "private/refund-failed/{$folder}/{$fileName}";
+                $failedPath = $failedRelativePath;
             }
 
             $duration = round(microtime(true) - $startTime, 2);

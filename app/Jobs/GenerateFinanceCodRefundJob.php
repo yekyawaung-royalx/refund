@@ -42,7 +42,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ->whereDate('payment_date', $this->paymentDate)
                     ->where('refund', 1)
                     ->where('vendor_type', 'Vendor')
-                    ->where('finance_export', 0)
+                    ->where('cod_refund_export', 0)
                     ->lockForUpdate();
 
                 // -----------------------------
@@ -56,7 +56,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ->whereDate('payment_date', $this->paymentDate)
                     ->where('refund', 1)
                     ->where('vendor_type', 'Invoice')
-                    ->where('finance_export', 0)
+                    ->where('cod_refund_export', 0)
                     ->pluck('id');
 
                 // Merge All IDs
@@ -98,7 +98,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
 
                 $group2 = (clone $query)
                     ->where('service_type', 'express')
-                    ->where('customer_reference_no', 'like', 'PB%')
+                    ->where('customer_reference_no', 'like', 'BP%')
                     ->sum('cod_payable_amount');
 
                 $group3 = (clone $query)
@@ -114,7 +114,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ->whereDate('payment_date', $this->paymentDate)
                     ->where('refund', 1)
                     ->where('vendor_type', 'Invoice')
-                    ->where('finance_export', 0);
+                    ->where('cod_refund_export', 0);
 
                 // E,PUB,PJ
                 $invoiceGroup1 = (clone $invoiceQuery)
@@ -129,7 +129,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 // BP
                 $invoiceGroup2 = (clone $invoiceQuery)
                     ->where('service_type', 'express')
-                    ->where('customer_reference_no', 'like', 'PB%')
+                    ->where('customer_reference_no', 'like', 'BP%')
                     ->sum('cod_payable_amount');
 
                 // Same Day
@@ -157,9 +157,9 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 ];
 
                 $rows[] = [
-                    'PB',
+                    'BP',
                     '231600',
-                    'CA-Cash In Hand PBAZ Interim',
+                    'CA-Cash In Hand BPAZ Interim',
                     '',
                     number_format((float)$group2, 2, '.', '')
                 ];
@@ -200,7 +200,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     'E,PUB,PJ',
                     '231604',
                     'CA-Cash in Hand E Code Interim',
-                    number_format((float)$invoiceGroup1, 2, '.', ''),
+                    number_format(abs((float)$invoiceGroup1), 2, '.', ''),
                     ''
                 ];
 
@@ -209,7 +209,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     'BP',
                     '231600',
                     'CA-Cash in Hand BPAZ Interim',
-                    number_format((float)$invoiceGroup2, 2, '.', ''),
+                    number_format(abs((float)$invoiceGroup2), 2, '.', ''),
                     ''
                 ];
 
@@ -218,7 +218,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     'Same Day',
                     '231606',
                     'CA-Cash in Hand Same Day Interim A/C',
-                    number_format((float)$invoiceGroup3, 2, '.', ''),
+                    number_format(abs((float)$invoiceGroup3), 2, '.', ''),
                     ''
                 ];
 
@@ -228,7 +228,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     '272750',
                     'CA-Last Mile (Receivable)',
                     '',
-                    number_format((float)$invoiceTotalCredit, 2, '.', '')
+                    number_format(abs((float)$invoiceTotalCredit), 2, '.', '')
                 ];
 
                 // -----------------------------
@@ -288,7 +288,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 DB::table('upload_data')
                     ->whereIn('id', $ids)
                     ->update([
-                        'finance_export' => $exportId,
+                        'cod_refund_export' => $exportId,
                         'updated_at' => now(),
                     ]);
 

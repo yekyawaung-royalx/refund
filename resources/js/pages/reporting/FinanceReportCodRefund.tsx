@@ -137,7 +137,7 @@ export default function FinanceReportCodRefund() {
   const fetchFiles = async (page: number = 1) => {
     try {
       setLoading(true);
-      const res = await fetch(`/finance-report/branches-deposit/exported-files?page=${page}`);
+      const res = await fetch(`/finance-report/cod-refund/exported-files?page=${page}`);
       const data: PaginatedResponse = await res.json();
 
       setFiles(data.data);
@@ -165,7 +165,7 @@ export default function FinanceReportCodRefund() {
   };
 
   const handleDownload = (id: number) => {
-    window.open(`/finance-report/branches-deposit/exported-files/${id}/download`, "_blank");
+    window.open(`/finance-report/cod-refund/exported-files/${id}/download`, "_blank");
   };
 
   // --- Export Handler ---

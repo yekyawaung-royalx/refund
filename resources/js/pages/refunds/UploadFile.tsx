@@ -8,7 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 import {
   UploadCloud,
   Loader2,
@@ -24,15 +29,30 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: "Upload File", href: "#" },
 ];
 
-const categories = [
-  { value: "no-refund", label: "No Refund (ငွေအမ်းရန်)" },
-  { value: "refund", label: "Refund (ငွေအမ်းပြီး)" },
+const waybill_categories = [
+  {
+    value: "receiver-postpaid",
+    label: "Receiver Pay Postpaid",
+  },
+  { 
+    value: "sender-postpaid", 
+    label: "Sender Pay Postpaid" 
+  },
+  {
+    value: "sender-prepaid",
+    label: "Sender Pay Prepaid",
+  },
+];
+const refunded_categories = [
+  { value: "refunded", label: "Refunded" },
 ];
 
-// ✅ permission mapping (scalable)
+// permission mapping (scalable)
 const permissionMap: Record<string, string> = {
-  "no-refund": "no-refund-upload",
-  refund: "refund-upload",
+  "sender-postpaid": "sender-postpaid",
+  "sender-prepaid": "sender-prepaid",
+  "receiver-postpaid": "receiver-postpaid",
+  "refunded": "refund-upload",
 };
 
 export default function UploadFile() {
@@ -43,42 +63,55 @@ export default function UploadFile() {
 
   const [category, setCategory] = React.useState("");
   const [title, setTitle] = React.useState("");
+  const [activeTab, setActiveTab] = React.useState("waybills");
 
-  // ✅ memoized filter
-  const filteredCategories = React.useMemo(() => {
-    return categories.filter((c) =>
-      hasPermission(permissionMap[c.value])
-    );
-  }, [auth?.permissions]);
+  // memoized filter
+  const filteredWaybillCategories = React.useMemo(() => {
+  return waybill_categories.filter((c) =>
+    hasPermission(permissionMap[c.value])
+  );
+}, [auth?.permissions]);
 
-  // ✅ fix invalid category automatically
+const filteredRefundedCategories = React.useMemo(() => {
+  return refunded_categories.filter((c) =>
+    hasPermission(permissionMap[c.value])
+  );
+}, [auth?.permissions]);
+
+const allCategories = [
+  ...filteredWaybillCategories,
+  ...filteredRefundedCategories,
+];
+
+  // fix invalid category automatically
   React.useEffect(() => {
-    if (!filteredCategories.find((c) => c.value === category)) {
-      setCategory(filteredCategories[0]?.value || "");
-    }
-  }, [filteredCategories]);
+  if (!allCategories.find((c) => c.value === category)) {
+    setCategory(allCategories[0]?.value || "");
+  }
+}, [allCategories]);
 
-  // ✅ title generator (safe)
+  // title generator (safe)
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
   const getTitleFromCategory = (cat: string) => {
-    const catLabel =
-      filteredCategories.find((c) => c.value === cat)?.label || "";
+  const catLabel =
+    allCategories.find((c) => c.value === cat)?.label || "";
 
-    if (!catLabel) return "";
+  if (!catLabel) return "";
 
-    const hyphenLabel = catLabel
-      .split("(")[0]
-      .trim()
-      .replace(/\s+/g, "-");
+  const hyphenLabel = catLabel
+    .split("(")[0]
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/\//g, "-");
 
-    return `${todayStr}-${hyphenLabel}`;
-  };
+  return `${todayStr}-${hyphenLabel}`;
+};
 
-  React.useEffect(() => {
-    setTitle(getTitleFromCategory(category));
-  }, [category]);
+React.useEffect(() => {
+  setTitle(getTitleFromCategory(category));
+}, [category]);
 
   const [file, setFile] = React.useState<File | null>(null);
   const [dragActive, setDragActive] = React.useState(false);
@@ -163,10 +196,10 @@ export default function UploadFile() {
       <Head title="Upload File" />
 
       <div className="p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
 
           {/* LEFT */}
-          <Card className="rounded-2xl shadow-md">
+          <Card className="lg:col-span-3 rounded-2xl shadow-md">
             <CardHeader>
               <CardTitle className="text-xl text-green-500 flex items-center gap-2">
                 <UploadIcon className="h-5 w-5" />
@@ -179,60 +212,138 @@ export default function UploadFile() {
 
                 {/* CATEGORY */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
+                 <Tabs
+  value={activeTab}
+  onValueChange={(value) => {
+    setActiveTab(value);
 
-                  {filteredCategories.length === 0 ? (
-                    <p className="text-sm text-red-500">
-                      You don’t have permission to upload files.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      {filteredCategories.map((c) => (
-                        <label
-                          key={c.value}
-                          className={cn(
-                            "cursor-pointer rounded-xl border p-4 flex items-start gap-3 transition shadow-sm",
-                            category === c.value
-                              ? "border-green-500 text-green-500 bg-green-100 dark:bg-gray-900 shadow-lg"
-                              : "border-muted bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          )}
-                        >
-                          <input
-                            type="radio"
-                            name="category"
-                            value={c.value}
-                            className="peer sr-only"
-                            checked={category === c.value}
-                            onChange={() => setCategory(c.value)}
-                          />
+    if (value === "waybills") {
+      setCategory(
+        filteredWaybillCategories[0]?.value || ""
+      );
+    }
 
-                          <span
-                            className={cn(
-                              "w-5 h-5 rounded-full border flex items-center justify-center",
-                              category === c.value
-                                ? "border-green-500 bg-green-500"
-                                : "border-gray-300 bg-gray-300"
-                            )}
-                          >
-                            {category === c.value && (
-                              <span className="w-2.5 h-2.5 bg-white rounded-full" />
-                            )}
-                          </span>
+    if (value === "refunded") {
+      setCategory(
+        filteredRefundedCategories[0]?.value || ""
+      );
+    }
+  }}
+  className="w-full"
+>
+      <TabsList>
+        <TabsTrigger value="waybills">All Waybills</TabsTrigger>
+        <TabsTrigger value="refunded">Refunded</TabsTrigger>
+      </TabsList>
+      <TabsContent value="waybills">
+      {filteredWaybillCategories.length === 0 ? (
+        <p className="text-sm text-red-500 mt-3">
+          You don’t have permission to upload files.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
+          {filteredWaybillCategories.map((c) => (
+            <label
+              key={c.value}
+              className={cn(
+                "cursor-pointer rounded-2xl border transition-all shadow-sm flex items-start px-2 py-4",
+                category === c.value
+                  ? "border-green-500 bg-green-50 dark:bg-green-950/20 shadow-lg"
+                  : "border-muted bg-white dark:bg-gray-900 hover:border-green-300"
+              )}
+            >
+              <input
+                type="radio"
+                name="category"
+                value={c.value}
+                checked={category === c.value}
+                onChange={() => setCategory(c.value)}
+                className="sr-only"
+              />
 
-                          <div>
-                            <div className="font-semibold">
-                              {c.label.split("(")[0].trim()}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {c.label.includes("(")
-                                ? c.label.split("(")[1].replace(")", "")
-                                : ""}
-                            </div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
+              <div
+                className={cn(
+                  "h-5 w-5 rounded-full border flex items-center justify-center",
+                  category === c.value
+                    ? "border-green-500"
+                    : "border-gray-400"
+                )}
+              >
+                {category === c.value && (
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                )}
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm ml-2">
+                  {c.label}
+                </p>
+
+                <p className="text-xs text-muted-foreground ml-2 mt-1">
+                  {c.label} CSV file
+                </p>
+              </div>
+            </label>
+          ))}
+        </div>
+      )}
+    </TabsContent>
+      <TabsContent value="refunded">
+      {filteredRefundedCategories.length === 0 ? (
+        <p className="text-sm text-red-500 mt-3">
+          You don’t have permission to upload files.
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 gap-4 mt-4">
+          {filteredRefundedCategories.map((c) => (
+            <label
+              key={c.value}
+              className={cn(
+                "cursor-pointer rounded-2xl border transition-all shadow-sm flex items-start px-2 py-4",
+                category === c.value
+                  ? "border-green-500 bg-green-50 dark:bg-green-950/20 shadow-lg"
+                  : "border-muted bg-white dark:bg-gray-900 hover:border-green-300"
+              )}
+            >
+              <input
+                type="radio"
+                name="category"
+                value={c.value}
+                checked={category === c.value}
+                onChange={() => setCategory(c.value)}
+                className="sr-only"
+              />
+
+              <div
+                className={cn(
+                  "h-5 w-5 rounded-full border flex items-center justify-center",
+                  category === c.value
+                    ? "border-green-500"
+                    : "border-gray-400"
+                )}
+              >
+                {category === c.value && (
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                )}
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm ml-2">
+                  {c.label}
+                </p>
+
+                <p className="text-xs text-muted-foreground ml-2 mt-1">
+                  {c.label} CSV file
+                </p>
+              </div>
+            </label>
+          ))}
+        </div>
+      )}
+    </TabsContent>
+      </Tabs>
+
+                  
                 </div>
 
                 {/* TITLE */}
@@ -285,7 +396,7 @@ export default function UploadFile() {
 
                 <Button
                   type="submit"
-                  disabled={uploading || filteredCategories.length === 0}
+                  disabled={uploading || allCategories.length === 0}
                   className="w-full bg-green-500 hover:bg-green-600 text-white"
                 >
                   {uploading ? (
@@ -303,7 +414,7 @@ export default function UploadFile() {
           </Card>
 
           {/* RIGHT (unchanged) */}
-          <Card className="rounded-2xl shadow-sm border border-muted">
+          <Card className="lg:col-span-2 rounded-2xl shadow-sm border border-muted">
             <CardHeader>
               <CardTitle className="text-lg text-green-500">
                 Instructions

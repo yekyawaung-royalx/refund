@@ -8,28 +8,30 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
-class CheckNoRefundFileJob implements ShouldQueue
+class CheckAllWaybillsFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
     protected string $username;
     protected int $uploadId;
     protected string $filePath;
+    protected string $category;
 
     public $timeout = 1800;
     public $tries = 1;
 
-    protected int $expectedColumns = 33;
-    protected int $dbChunkSize = 1000;
+    protected int $expectedColumns = 34;
+    private array $paymentRules = [];
 
-    public function __construct(int $uploadId, string $filePath, string $username)
+    public function __construct(int $uploadId, string $filePath, string $username, string $category)
     {
         $this->uploadId = $uploadId;
         $this->filePath = $filePath;
         $this->username = $username;
+        $this->category = $category;
+        $this->paymentRules = config('payment_rules') ?? [];
     }
 
     public function handle()
@@ -67,15 +69,15 @@ class CheckNoRefundFileJob implements ShouldQueue
             if (!$headers || count($headers) !== $this->expectedColumns) {
                 $upload->update([
                     'status' => 'failed',
-                    'error_message' => 'Invalid no refund file. Column count must be 33.',
+                    'error_message' => 'Invalid no refund file. Column count must be 34.',
                 ]);
                 return;
             }
 
             $rowNumber = 1;
+            $maxErrors = 1000;
             $errorRows = [];
             $fileWaybills = [];
-            $fileDate = null;
 
             // -------------------------
             // Row Validation Loop
@@ -94,7 +96,7 @@ class CheckNoRefundFileJob implements ShouldQueue
                 // -------------------------------
                 $addressIndex = 17; // receiver_name / address
                 while (count($row) > $this->expectedColumns) {
-                    $row[$addressIndex] .= ' ' . array_pop($row);
+                    $row[$addressIndex] = ($row[$addressIndex] ?? '') . ' ' . array_pop($row);
                 }
 
                 while (count($row) < $this->expectedColumns) {
@@ -103,7 +105,7 @@ class CheckNoRefundFileJob implements ShouldQueue
 
                 // Column count check
                 if (count($row) !== $this->expectedColumns) {
-                    if (count($errorRows) < 1000) {
+                    if (count($errorRows) < $maxErrors) {
                         $errorRows[] = "Row {$rowNumber}: Invalid column count";
                     }
                     continue;
@@ -111,29 +113,25 @@ class CheckNoRefundFileJob implements ShouldQueue
 
                 // Date validation
                 if (empty($row[1])) {
-                    if (count($errorRows) < 1000) {
+                    if (count($errorRows) < $maxErrors) {
                         $errorRows[] = "Row {$rowNumber}: Empty outbound date";
                     }
                     continue;
                 }
 
                 try {
-                    $date = Carbon::parse($row[1]);
+                    Carbon::parse($row[1]);
                 } catch (\Exception $e) {
-                    if (count($errorRows) < 1000) {
+                    if (count($errorRows) < $maxErrors) {
                         $errorRows[] = "Row {$rowNumber}: Invalid date format";
                     }
                     continue;
                 }
 
-                if (!$fileDate) {
-                    $fileDate = $date;
-                }
-
                 // Waybill validation
-                $waybill = trim($row[9] ?? '');
+                $waybill = strtoupper(trim($row[9] ?? ''));
                 if (empty($waybill)) {
-                    if (count($errorRows) < 1000) {
+                    if (count($errorRows) < $maxErrors) {
                         $errorRows[] = "Row {$rowNumber}: Waybill empty";
                     }
                     continue;
@@ -142,21 +140,67 @@ class CheckNoRefundFileJob implements ShouldQueue
                 // Weight validation
                 $weight = (float)($row[23] ?? 0);
                 if ($weight <= 0) {
-                    if (count($errorRows) < 1000) {
+                    if (count($errorRows) < $maxErrors) {
                         $errorRows[] = "Row {$rowNumber}: Weight cannot be 0 or empty";
                     }
                     continue;
                 }
 
+                //$fileWaybills[$waybill] = true;
+                $accountingDate = match ($this->category) {
+                    'sender-prepaid' => !empty($row[1])
+                        ? date('Y-m-d', strtotime($row[1]))
+                        : null,
+
+                    'sender-postpaid', 'receiver-postpaid' => !empty($row[31])
+                        ? date('Y-m-d', strtotime($row[31]))
+                        : null,
+
+                    default => null,
+                };
+
                 // Duplicate in file
-                if (isset($fileWaybills[$waybill])) {
-                    if (count($errorRows) < 1000) {
-                        $errorRows[] = "Row {$rowNumber}: Duplicate waybill in file ({$waybill})";
+                $duplicateKey =
+                    $waybill .
+                    '|' .
+                    ($accountingDate ?? 'NULL');
+
+                if (isset($fileWaybills[$duplicateKey])) {
+
+                    $firstRow = $fileWaybills[$duplicateKey]['row'];
+
+                    if (count($errorRows) < $maxErrors) {
+
+                        $errorRows[] =
+                            "Row {$rowNumber}: Duplicate waybill in file ({$waybill}) first found at row {$firstRow}";
                     }
+
                     continue;
                 }
 
-                $fileWaybills[$waybill] = true;
+
+                $fileWaybills[$duplicateKey] = [
+                    'row' => $rowNumber,
+                    'accounting_date' => $accountingDate,
+                ];
+
+                $customErrors = $this->validateCategoryRules(
+                    $row,
+                    $rowNumber,
+                    $this->category
+                );
+
+                if (!empty($customErrors)) {
+
+                    foreach ($customErrors as $err) {
+
+                        if (count($errorRows) < $maxErrors) {
+                            $errorRows[] = $err;
+                        }
+                    }
+
+                    continue;
+                }
 
                 // File size protection
                 if (count($fileWaybills) > 200000) {
@@ -174,59 +218,22 @@ class CheckNoRefundFileJob implements ShouldQueue
             }
 
             // -------------------------
-            // Date range calculation (based on file)
-            // -------------------------
-            if (!$fileDate) {
-                throw new \Exception("No valid date found in file");
-            }
-
-            $endDate = $fileDate->copy()->endOfMonth();
-            $startDate = $fileDate->copy()->subMonths(2)->startOfMonth();
-
-            // -------------------------
-            // Database Duplicate Check
-            // -------------------------
-            $waybillNumbers = array_keys($fileWaybills);
-
-            foreach (array_chunk($waybillNumbers, $this->dbChunkSize) as $chunk) {
-
-                $duplicates = DB::table('upload_data')
-                    ->whereBetween('delivered_date', [$startDate, $endDate])
-                    ->whereIn('waybill_no', $chunk)
-                    ->pluck('waybill_no');
-
-                foreach ($duplicates as $dup) {
-                    if (count($errorRows) >= 1000) {
-                        break 2;
-                    }
-                    $errorRows[] = "Duplicate waybill in database: {$dup}";
-                }
-            }
-
-            if (!empty($errorRows)) {
-                $upload->update([
-                    'status' => 'failed',
-                    'error_message' => substr(implode("\n", $errorRows), 0, 65000),
-                ]);
-                return;
-            }
-
-            // -------------------------
             // Validated → Dispatch Import
             // -------------------------
             $upload->update([
                 'status' => 'validated',
             ]);
 
-            ImportNoRefundFileJob::dispatch(
+            ImportAllWaybillsFileJob::dispatch(
                 $this->uploadId, 
                 $this->filePath,
-                $this->username
+                $this->username,
+                $this->category,
             )->onQueue('import');
 
         } catch (\Throwable $e) {
 
-            Log::error('CheckNoRefundFileJob failed', [
+            Log::error('CheckAllWaybillsFileJob failed', [
                 'upload_id' => $this->uploadId,
                 'error' => $e->getMessage(),
             ]);
@@ -238,6 +245,58 @@ class CheckNoRefundFileJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+
+    private function validateCategoryRules(array $row, int $rowNumber, string $category): array
+    {
+        $errors = [];
+        $rule = $this->paymentRules[$category] ?? null;
+
+        if (!$rule) {
+            return ["Row {$rowNumber}: Invalid category type ({$category})"];
+        }
+
+        $paymentBy   = $this->normalize($row[20] ?? '');
+        $paymentType = $this->normalize($row[21] ?? '');
+
+        $expectedBy   = $this->normalize($rule['payment_by'] ?? '');
+        $expectedType = $this->normalize($rule['payment_type'] ?? '');
+
+        if ($paymentBy !== $expectedBy) {
+            $errors[] = "Row {$rowNumber}: Payment By must be '{$rule['payment_by']}'";
+        }
+
+        if ($paymentType !== $expectedType) {
+            $errors[] = "Row {$rowNumber}: Payment Type must be '{$rule['payment_type']}'";
+        }
+
+        $checks = $rule['checks'] ?? [];
+
+        if (($checks['origin_branch_required'] ?? false) && empty(trim($row[11] ?? ''))) {
+            $errors[] = "Row {$rowNumber}: Origin Branch cannot be empty";
+        }
+
+        if (($checks['destination_branch_required'] ?? false) && empty(trim($row[13] ?? ''))) {
+            $errors[] = "Row {$rowNumber}: Destination Branch cannot be empty";
+        }
+
+        if (($checks['delivered_date_required'] ?? false) && empty(trim($row[31] ?? ''))) {
+            $errors[] = "Row {$rowNumber}: Delivered Date cannot be empty";
+        }
+
+        if (($checks['express_income_required'] ?? false) && ((float)($row[24] ?? 0)) <= 0) {
+            $errors[] = "Row {$rowNumber}: Express Income must be > 0";
+        }
+
+        if (($checks['cod_required'] ?? false)) {
+            if ((float)($row[25] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Total Amount must be >= 0";
+            if ((float)($row[26] ?? 0) <= 0) $errors[] = "Row {$rowNumber}: COD Express Income must be > 0";
+            if ((float)($row[27] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Income must be >= 0";
+            if ((float)($row[28] ?? 0)  === '') $errors[] = "Row {$rowNumber}: COD Payable must not be empty";
+        }
+
+        return $errors;
     }
 
     private function fixBrokenCsv(string $filePath)
@@ -270,5 +329,10 @@ class CheckNoRefundFileJob implements ShouldQueue
         }
 
         file_put_contents($filePath, implode("\n", $fixedLines));
+    }
+
+    private function normalize(string $value): string
+    {
+        return strtolower(trim($value));
     }
 }

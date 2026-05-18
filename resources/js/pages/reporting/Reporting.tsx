@@ -51,12 +51,12 @@ function SingleDatePicker({
 }
 
 export default function Reporting() {
-  const { results, execution_time_ms, used_partitions, selected_date } = usePage().props as any;
+  const { results, execution_time_ms, partition_scanned, selected_date } = usePage().props as any;
   const data = results?.data ?? [];
 
 // Pagination state
-const [currentPage, setCurrentPage] = React.useState(1);
-const rowsPerPage = 50;
+// const [currentPage, setCurrentPage] = React.useState(1);
+// const rowsPerPage = 50;
 
 
   // --- State for filters ---
@@ -66,6 +66,12 @@ const [selectedRows, setSelectedRows] = React.useState<Set<number>>(new Set());
   const [selectedDate, setSelectedDate] = React.useState<Date>(today);
 
   const [rawData, setRawData] = React.useState<any[]>([]);
+  const [pagination, setPagination] = React.useState({
+  current_page: 1,
+  last_page: 1,
+  per_page: 200,
+  total: 0,
+});
   const [filteredData, setFilteredData] = React.useState<any[]>([]);
 
   const [executionTime, setExecutionTime] = React.useState<number>(0);
@@ -87,22 +93,33 @@ const [selectedRows, setSelectedRows] = React.useState<Set<number>>(new Set());
 
   const filtersDisabled = rawData.length === 0;
 
-  const fetchData = async (date: Date) => {
-    setLoading(true);
+  const fetchData = async (date: Date, page = 1) => {
+  setLoading(true);
 
-    const res = await fetch(`/reporting/search?date=${format(date, "yyyy-MM-dd")}`);
-    const json = await res.json();
+  const res = await fetch(
+    `/reporting/search?date=${format(date, "yyyy-MM-dd")}&page=${page}`
+  );
 
-    const data = json.data ?? [];
+  const json = await res.json();
 
-    setRawData(data);
-    setFilteredData(data);
+  // Laravel paginate response
+  const rows = json.data.data ?? [];
 
-    setExecutionTime(json.execution_time_ms ?? 0);
-    setPartition(json.partition_scanned ?? "");
+  setRawData(rows);
+  setFilteredData(rows);
 
-    setLoading(false);
-  };
+  setPagination({
+    current_page: json.current_page ?? 1,
+    last_page: json.last_page ?? 1,
+    per_page: json.per_page ?? 200,
+    total: json.total ?? 0,
+  });
+
+  setExecutionTime(json.execution_time_ms ?? 0);
+  setPartition(json.partition_scanned ?? "");
+
+  setLoading(false);
+};
 
 React.useEffect(() => {
     fetchData(today);
@@ -216,14 +233,7 @@ const toggleAllRows = () => {
 };
 
 // Compute paginated data
-const paginatedData = React.useMemo(() => {
-  const start = (currentPage - 1) * rowsPerPage;
-  const end = start + rowsPerPage;
-  return filteredData.slice(start, end);
-}, [filteredData, currentPage]);
-
-// Compute total pages
-const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+const paginatedData = filteredData;
 
 // --- Export CSV ---
 const exportCSV = () => {
@@ -485,13 +495,13 @@ const selectedTotals = React.useMemo(() => {
                 <div>
   <span className="text-sm font-medium">Found Records:</span>{" "}
   <span className="inline-block bg-sky-100 text-sky-800 text-xs font-semibold px-2 py-1 rounded-full">
-    {filteredData.length}
+    {pagination.total}
   </span>
 </div>
                 <div>
                   <span className="text-sm font-medium">Scan Partitions:</span>{" "}
                   <span className="inline-block bg-amber-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                    {used_partitions}
+                    {partition_scanned}
                   </span>
                 </div>
               </div>
@@ -547,7 +557,7 @@ const selectedTotals = React.useMemo(() => {
 <TableBody>
   {paginatedData.length ? (
     paginatedData.map((row, i) => {
-      const originalIndex = (currentPage - 1) * rowsPerPage + i;
+      const originalIndex = i;
       return (
         <TableRow key={originalIndex}>
           <TableCell>
@@ -575,18 +585,24 @@ const selectedTotals = React.useMemo(() => {
             <div className="flex justify-end items-center mt-4 gap-2">
   <Button
     size="sm"
-    disabled={currentPage === 1}
-    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+    disabled={pagination.current_page === 1}
+    onClick={() => {
+      fetchData(selectedDate, pagination.current_page - 1);
+    }}
   >
     Previous
   </Button>
+
   <span>
-    Page {currentPage} of {totalPages}
+    Page {pagination.current_page} of {pagination.last_page}
   </span>
+
   <Button
     size="sm"
-    disabled={currentPage === totalPages}
-    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+    disabled={pagination.current_page === pagination.last_page}
+    onClick={() => {
+      fetchData(selectedDate, pagination.current_page + 1);
+    }}
   >
     Next
   </Button>

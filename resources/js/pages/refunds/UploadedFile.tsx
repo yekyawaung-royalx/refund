@@ -54,6 +54,7 @@ export interface FileItem {
   id: number;
   title: string;
   category: string;
+  type: string;
   filename: string;
   folder: string;
   file_path: string;
@@ -93,6 +94,7 @@ export default function UploadedFile() {
   created_at: "w-[120px]",
   title: "w-[180px]",
   category: "w-[100px]",
+  type: "w-[140px]",
   total_rows: "w-[120px]",
   process_stats: "w-[140px]",
   job_stats: "w-[140px]",
@@ -199,6 +201,7 @@ export default function UploadedFile() {
 <TableHead className={columnWidths.created_at}>Created Date</TableHead>
 <TableHead className={columnWidths.title}>Title</TableHead>
 <TableHead className={columnWidths.category}>Category</TableHead>
+<TableHead className={columnWidths.type}>Type</TableHead>
 <TableHead className={columnWidths.total_rows}>Total Rows</TableHead>
 <TableHead className={columnWidths.process_stats}>Process Stats</TableHead>
 <TableHead className={columnWidths.job_stats}>Job Stats</TableHead>
@@ -217,25 +220,36 @@ export default function UploadedFile() {
                       </TableCell>
                       <TableCell className={cn("truncate", columnWidths.title)}>{item.title}</TableCell>
                       <TableCell className={columnWidths.category}>
-  {item.category === "refund" ? (
-    <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
-      Refund
-    </Badge>
-  ) : (
-    <Badge className="border border-amber-500 text-amber-500 bg-transparent rounded-2xl">
-      No Refund
-    </Badge>
-  )}
-</TableCell>
+                        {item.category === "refunded" ? (
+                          <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
+                            Refunded
+                          </Badge>
+                        ) : (
+                          <Badge className="border border-amber-500 text-amber-500 bg-transparent rounded-2xl">
+                            No Refund
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className={columnWidths.category}>
+                        {item.category === "refunded" ? (
+                          <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
+                            {item.type}
+                          </Badge>
+                        ) : (
+                          <Badge className="border border-amber-500 text-amber-500 bg-transparent rounded-2xl">
+                            {item.type}
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className={cn("font-semibold", columnWidths.total_rows)}>{item.total_rows.toLocaleString()}</TableCell>
                       <TableCell className={columnWidths.process_stats}>
                         <span className="text-muted-foreground">Passed:</span> <span className="text-green-500">{item.processed_rows.toLocaleString()}</span> <br />
                         <span className="text-muted-foreground">Failed:</span> <span className="text-red-500">{item.failed_rows.toLocaleString()}</span>
                         </TableCell>
-<TableCell className={columnWidths.job_stats}>
-  <span className="text-muted-foreground">Attempts:</span> {item.attempts} <br />
-  <span className="text-muted-foreground">Duration:</span> {item.processed_duration? item.processed_duration:0}s
-  </TableCell>
+                        <TableCell className={columnWidths.job_stats}>
+                          <span className="text-muted-foreground">Attempts:</span> {item.attempts} <br />
+                          <span className="text-muted-foreground">Duration:</span> {item.processed_duration? item.processed_duration:0}s
+                          </TableCell>
                       <TableCell className={columnWidths.status}>{getStatusBadge(item.status)}</TableCell>
                     <TableCell className={cn("flex gap-2", columnWidths.actions)}>
                       {item.error_message && (

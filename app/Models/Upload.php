@@ -12,6 +12,7 @@ class Upload extends Model
     protected $fillable = [
         'title',
         'category',
+        'type',
         'filename',
         'folder',
         'file_path',

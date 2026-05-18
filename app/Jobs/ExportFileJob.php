@@ -50,12 +50,10 @@ class ExportFileJob
             // Determine partitions
             // -----------------------------
             $current = Carbon::createFromFormat('Ym', $this->yearMonth);
-            $previous = $current->copy()->subMonth();
 
-            $currentPartition = "P" . $current->format('Ym');
-            $previousPartition = "P" . $previous->format('Ym');
-
-            $partitions = [$previousPartition, $currentPartition];
+            $partitions = collect(range(0, 2))
+                ->map(fn($i) => "P" . $current->copy()->subMonths($i)->format('Ym'))
+                ->toArray();
 
             $existingPartitions = DB::table('information_schema.PARTITIONS')
                 ->where('TABLE_SCHEMA', DB::getDatabaseName())

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Jobs\CheckNoRefundFileJob;
+use App\Jobs\CheckAllWaybillsFileJob;
 use App\Jobs\CheckRefundFileJob;
 use Carbon\Carbon;
 use Inertia\Inertia;
@@ -21,11 +21,24 @@ class UploadController extends Controller
 
     public function uploaded_file(Request $request)
     {
+
         $request->validate([
             'title' => 'required|string',
             'category' => 'required|string',
             'file' => 'required|mimes:csv,xlsx|max:81920'
         ]);
+
+        $waybillCategories = [
+            'sender-postpaid',
+            'sender-prepaid',
+            'receiver-postpaid',
+        ];
+
+        if (in_array($request->category, $waybillCategories)) {
+            $category = 'no-refund';
+        } else {
+            $category = 'refunded';
+        }
 
         $file = $request->file('file');
 
@@ -41,7 +54,8 @@ class UploadController extends Controller
         // Save upload record (store folder path too)
         $upload = Upload::create([
             'title' => $request->title,
-            'category' => $request->category,
+            'category' => $category,
+            'type' => $request->category,
             'filename' => $filename,
             'folder' => $folder,
             'file_path' => $path,
@@ -54,10 +68,11 @@ class UploadController extends Controller
         $absolutePath = storage_path("app/private/{$path}");
 
         // Dispatch job based on category 
-        if ($request->category === 'refund') { 
+        // sender-postpaid, sender-prepaid, receiver-postpaid, refund
+        if ($request->category === 'refunded') { 
             CheckRefundFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name); 
         } else { 
-            CheckNoRefundFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name); 
+            CheckAllWaybillsFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name, $request->category); 
         }
 
         return redirect()
@@ -102,10 +117,9 @@ class UploadController extends Controller
         /**
          * category based column
          */
-        $column = $file->category === 'refund'
+        $column = $file->category === 'refunded'
             ? 'refund_id'
             : 'norefund_id';
-
         /**
          * query
          */
@@ -241,7 +255,7 @@ class UploadController extends Controller
         }
 
         // failed_path
-        $filePath = storage_path('app/' . $export->failed_path);
+        $filePath = storage_path('app/private/' . $export->failed_path);
 
         if (!file_exists($filePath)) {
             abort(404, 'File does not exist');
