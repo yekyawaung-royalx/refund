@@ -22,7 +22,7 @@ class CheckAllWaybillsFileJob implements ShouldQueue
     public $timeout = 1800;
     public $tries = 1;
 
-    protected int $expectedColumns = 34;
+    
     private array $paymentRules = [];
 
     public function __construct(int $uploadId, string $filePath, string $username, string $category)
@@ -43,6 +43,8 @@ class CheckAllWaybillsFileJob implements ShouldQueue
             'status' => 'checking',
             'attempts' => $this->attempts(),
         ]);
+
+        $expectedColumns = $this->getExpectedColumns();
 
         if (!file_exists($this->filePath)) {
             $upload->update([
@@ -66,10 +68,11 @@ class CheckAllWaybillsFileJob implements ShouldQueue
             // Header Validation
             // -------------------------
             $headers = $file->fgetcsv();
-            if (!$headers || count($headers) !== $this->expectedColumns) {
+            //if (!$headers || count($headers) !== $this->expectedColumns) {
+            if (!$headers || count($headers) !== $expectedColumns){
                 $upload->update([
                     'status' => 'failed',
-                    'error_message' => 'Invalid no refund file. Column count must be 34.',
+                    'error_message' => "Invalid file. Column count must be {$expectedColumns}.",
                 ]);
                 return;
             }
@@ -95,16 +98,19 @@ class CheckAllWaybillsFileJob implements ShouldQueue
                 // Fix extra columns in receiver_name/address
                 // -------------------------------
                 $addressIndex = 17; // receiver_name / address
-                while (count($row) > $this->expectedColumns) {
+                //while (count($row) > $this->expectedColumns) {
+                while (count($row) > $expectedColumns){
                     $row[$addressIndex] = ($row[$addressIndex] ?? '') . ' ' . array_pop($row);
                 }
 
-                while (count($row) < $this->expectedColumns) {
+                //while (count($row) < $this->expectedColumns) {
+                while (count($row) < $expectedColumns){
                     $row[] = '';
                 }
 
                 // Column count check
-                if (count($row) !== $this->expectedColumns) {
+                //if (count($row) !== $this->expectedColumns) {
+                if (count($row) !== $expectedColumns){
                     if (count($errorRows) < $maxErrors) {
                         $errorRows[] = "Row {$rowNumber}: Invalid column count";
                     }
@@ -290,10 +296,10 @@ class CheckAllWaybillsFileJob implements ShouldQueue
         }
 
         if (($checks['cod_required'] ?? false)) {
-            if ((float)($row[25] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Total Amount must be >= 0";
-            if ((float)($row[26] ?? 0) <= 0) $errors[] = "Row {$rowNumber}: COD Express Income must be > 0";
-            if ((float)($row[27] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Income must be >= 0";
-            if ((float)($row[28] ?? 0)  === '') $errors[] = "Row {$rowNumber}: COD Payable must not be empty";
+            if ((float)($row[25] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Total Amount must be >= 0"; //0,+
+            if ((float)($row[26] ?? 0) <= 0) $errors[] = "Row {$rowNumber}: COD Express Income must be > 0"; // >0
+            if ((float)($row[27] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Income must be >= 0"; //0,+
+            if ((float)($row[28] ?? 0)  === '') $errors[] = "Row {$rowNumber}: COD Payable must not be empty"; //0,+,-
         }
 
         return $errors;
@@ -334,5 +340,18 @@ class CheckAllWaybillsFileJob implements ShouldQueue
     private function normalize(string $value): string
     {
         return strtolower(trim($value));
+    }
+
+    private function getExpectedColumns(): int
+    {
+        //return $this->paymentRules[$this->category]['columns'] ?? 34;
+
+        return match ($this->category) {
+            'receiver-postpaid' => 33,
+            'sender-prepaid'    => 33,
+            'sender-postpaid'   => 33,
+
+            default => 33,
+        };
     }
 }
