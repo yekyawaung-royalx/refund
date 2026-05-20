@@ -187,7 +187,7 @@ class ImportAllWaybillsFileJob implements ShouldQueue
                         'cod_express_income_amount' => isset($row[26]) ? (float)$row[26] : null,
                         'cod_income_amount' => isset($row[27]) ? (float)$row[27] : null,
                         'cod_payable_amount' => isset($row[28]) ? (float)$row[28] : null,
-                        'insurance_expense_amount' => isset($row[32]) ? (float)$row[32] : null,
+                        'insurance_expense_amount' => '0.0',
                         'refund' => 0,
                         'service_type' => $row[29] ?? null,
                         //'waybill_status' => $row[30] ?? null,
