@@ -107,7 +107,7 @@ export default function View() {
                       <TableRow key={i}>
                         {row.map((cell, j) => (
                           <TableCell key={j} className="whitespace-nowrap">
-                            {cell || "-"}
+                            {cell || ""}
                           </TableCell>
                         ))}
                       </TableRow>

@@ -40,6 +40,12 @@ const mainNavItems: NavItem[] = [
                 permission: "finance-reports", 
                 icon: FileInput 
             },
+            { 
+                title: 'Sender/Receiver Report', 
+                href: '/finance-report/sender-receiver-report', 
+                permission: "finance-reports", 
+                icon: FileInput 
+            },
         ],
     },
     {

@@ -110,7 +110,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/finance-report/cod-refund', [ReportingController::class, 'finance_report_cod_refund']);
     Route::get('/finance-report/cod-refund/export', [ReportingController::class, 'cod_refund_export']);
     Route::get('/finance-report/cod-refund/exported-files', [ReportingController::class, 'finance_report_cod_refund_files']);
-    
+    Route::get('/finance-report/cod-refund/exported-files/{id}/download',[ReportingController::class, 'download_exported_cod_refund_file']);  
+    Route::get('/finance-report/sender-receiver-report', [ReportingController::class, 'finance_report_sender_receiver']);
+    Route::get('/finance-report/sender-receiver-report/export', [ReportingController::class, 'sender_receiver_export']);
+    Route::get('/finance-report/sender-receiver-report/exported-files', [ReportingController::class, 'finance_report_sender_receiver_files']);
+    Route::get('/finance-report/sender-receiver-report/exported-files/{id}/download',[ReportingController::class, 'download_exported_sender_receiver_file']);  
+
     Route::get('/notes', [NoteController::class, 'notes']);
     Route::get('/notes/laravel-queue', [NoteController::class, 'laravel_queue']);
     Route::get('/notes/laravel-production', [NoteController::class, 'laravel_production']);

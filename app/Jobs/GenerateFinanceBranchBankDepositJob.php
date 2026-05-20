@@ -218,13 +218,14 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             // -----------------------------
             // Save export record & get id
             // -----------------------------
+            Log::info("category: " . $this->category);
             $financeExportId = DB::table('finance_exports')->insertGetId([
                 'filename' => $fileName,
                 'filepath' => $relativePath,
                 'report_date' => $this->deliveredDate,
                 'report_type' => 'branches-deposit',
                 'category' => $this->category,
-                'filtered' => $this->branch ?? 'ALL',
+                'filtered' => $this->category ?? 'ALL',
                 'total_rows' => count($insertData),
                 'duration' => round((microtime(true) - $startTime), 2),
                 'exported_by' => $this->exportedBy,

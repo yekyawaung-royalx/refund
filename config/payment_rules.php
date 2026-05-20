@@ -2,6 +2,7 @@
 return [
 
     'sender-prepaid' => [
+        'columns' => 34,
         'payment_by' => 'sender pay',
         'payment_type' => 'prepaid',
         'checks' => [
@@ -11,6 +12,7 @@ return [
     ],
 
     'sender-postpaid' => [
+        'columns' => 34,
         'payment_by' => 'sender pay',
         'payment_type' => 'postpaid',
         'checks' => [
@@ -21,6 +23,7 @@ return [
     ],
 
     'receiver-postpaid' => [
+        'columns' => 33,
         'payment_by' => 'receiver pay',
         'payment_type' => 'postpaid',
         'checks' => [

@@ -111,7 +111,11 @@ class ExportFileJob implements ShouldQueue
             $folder = $current->format('Y-m');
             $directory = storage_path("app/private/exports/{$folder}");
 
-            if (!is_dir($directory)) mkdir($directory, 0755, true);
+            if (!is_dir($directory)) {
+                if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
+                    throw new \Exception("Failed to create directory: {$directory}");
+                }
+            }
 
             $relativePath = "private/exports/{$folder}/{$fileName}";
             $filePath = storage_path("app/{$relativePath}");

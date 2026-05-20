@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use Carbon\Carbon;
 use App\Jobs\GenerateFinanceBranchBankDepositJob;
 use App\Jobs\GenerateFinanceCodRefundJob;
+use App\Jobs\GenerateFinanceSenderReceiverJob;
 use App\Models\FinanceExport;
 use Auth;
 
@@ -179,6 +180,15 @@ class ReportingController extends Controller
         ]);
     }
 
+    public function finance_report_sender_receiver(Request $request)
+    {
+        $branches = DB::table('analytics')->where('journal','!=','')->get();
+
+        return Inertia::render('reporting/FinanceSenderReceiverReport', [
+            'branches' => $branches
+        ]);
+    }
+
     public function branches_deposit_export(Request $request)
     {
         // GET query parameters
@@ -229,6 +239,30 @@ class ReportingController extends Controller
         ]);
     }
 
+    public function sender_receiver_export(Request $request)
+    {
+        // GET query parameters
+        $accountingDate = $request->query('accounting_date');
+        $category = $request->query('category');
+
+        // -------------------------
+        // Dispatch Job (Queue)
+        // -------------------------
+        // Category: all, sender-pay-prepaid , receiver-pay-postpaid
+        GenerateFinanceSenderReceiverJob::dispatch($accountingDate, $category, auth()->user()->name);
+
+        // -------------------------
+        // Response
+        // -------------------------
+        return response()->json([
+            'status' => 'queued',
+            'message' => 'Finance report job is processing in background',
+            'data' => [
+                'accounting_date' => $accountingDate,
+            ]
+        ]);
+    }
+
     public function finance_exported_branches_deposit_files(Request $request)
     {
         $files = DB::table('finance_exports')->where('report_type','branches-deposit')->orderBy('id','desc')->paginate(20);
@@ -239,6 +273,13 @@ class ReportingController extends Controller
     public function finance_report_cod_refund_files(Request $request)
     {
         $files = DB::table('finance_exports')->where('report_type','cod-refund')->orderBy('id','desc')->paginate(20);
+
+        return response()->json($files);
+    }
+
+     public function finance_report_sender_receiver_files(Request $request)
+    {
+        $files = DB::table('finance_exports')->where('report_type','sender-receiver')->orderBy('id','desc')->paginate(20);
 
         return response()->json($files);
     }
@@ -287,6 +328,46 @@ class ReportingController extends Controller
     }
 
     public function download_exported_branches_deposit_file($id)
+    {
+        $export = DB::table('finance_exports')->where('id', $id)->first();
+
+        if (!$export) {
+            abort(404, 'File not found');
+        }
+
+        // folder from created_at
+        $folder = Carbon::parse($export->created_at)->format('Y-m');
+
+        $filePath = storage_path("app/private/finance-reports/{$folder}/{$export->filename}");
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File does not exist');
+        }
+
+        return response()->download($filePath, $export->filename);
+    }
+
+    public function download_exported_cod_refund_file($id)
+    {
+        $export = DB::table('finance_exports')->where('id', $id)->first();
+
+        if (!$export) {
+            abort(404, 'File not found');
+        }
+
+        // folder from created_at
+        $folder = Carbon::parse($export->created_at)->format('Y-m');
+
+        $filePath = storage_path("app/private/finance-reports/{$folder}/{$export->filename}");
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File does not exist');
+        }
+
+        return response()->download($filePath, $export->filename);
+    }
+
+    public function download_exported_sender_receiver_file($id)
     {
         $export = DB::table('finance_exports')->where('id', $id)->first();
 
