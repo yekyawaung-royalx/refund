@@ -92,7 +92,8 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ->where(function ($q) {
                         $q->where('customer_reference_no', 'like', 'E%')
                           ->orWhere('customer_reference_no', 'like', 'PUB%')
-                          ->orWhere('customer_reference_no', 'like', 'PJ%');
+                          ->orWhere('customer_reference_no', 'like', 'PJ%')
+                          ->orWhere('customer_reference_no', 'like', 'PT%');
                     })
                     ->sum('cod_payable_amount');
 
@@ -122,7 +123,8 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ->where(function ($q) {
                         $q->where('customer_reference_no', 'like', 'E%')
                         ->orWhere('customer_reference_no', 'like', 'PUB%')
-                        ->orWhere('customer_reference_no', 'like', 'PJ%');
+                        ->orWhere('customer_reference_no', 'like', 'PJ%')
+                        ->orWhere('customer_reference_no', 'like', 'PT%');
                     })
                     ->sum('cod_payable_amount');
 
@@ -149,7 +151,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 // 1. PAYMENT ACCOUNT VENDOR
                 // =================================================
                 $rows[] = [
-                    'E/PUB/PJ',
+                    'E/PUB/PJ/PT',
                     '231604',
                     'CA-Cash In Hand E Code Interim',
                     '',
@@ -197,7 +199,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
 
                 // E,PUB,PJ
                 $rows[] = [
-                    'E,PUB,PJ',
+                    'E,PUB,PJ/PT',
                     '231604',
                     'CA-Cash in Hand E Code Interim',
                     number_format(abs((float)$invoiceGroup1), 2, '.', ''),

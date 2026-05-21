@@ -136,7 +136,7 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->select(
                         'u.destination_branch as branch',
                         'a.journal',
-                        DB::raw('SUM(u.cod_express_income_amount) as amount')
+                        DB::raw('SUM(u.express_income_amount) as amount')
                     )
                     ->groupBy('u.destination_branch', 'a.journal')
                     ->get();
