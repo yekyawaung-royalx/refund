@@ -246,16 +246,16 @@ export default function FinanceReportCodRefund() {
           <CardContent className="overflow-x">
             <Table className="min-w-full table-fixed">
               <TableHeader>
-                <TableRow>
-        <TableHead className="w-[250px]">Filename</TableHead>
-        <TableHead className="w-[140px]">Created Date</TableHead>
-        <TableHead className="w-[140px]">Delivered Date</TableHead>
-        <TableHead className="w-[120px]">Category</TableHead>
-        <TableHead className="w-[50px]">Filtered</TableHead>
-        <TableHead className="w-[100px] text-right">Rows</TableHead>
-        <TableHead className="w-[120px] text-right">Duration</TableHead>
-        <TableHead className="w-[150px]">Exported By</TableHead>
-        <TableHead className="w-[120px]">Actions</TableHead>
+                <TableRow className="bg-green-500/20 border rounded-lg">
+        <TableHead className="w-[250px]">Filename<br />&nbsp;</TableHead>
+        <TableHead className="w-[120px]">Payment <br />Date</TableHead>
+        <TableHead className="w-[120px]">Created <br />Date</TableHead>
+        <TableHead className="w-[120px]">Category <br />&nbsp;</TableHead>
+        <TableHead className="w-[50px]">Filtered <br />&nbsp;</TableHead>
+        <TableHead className="w-[100px] text-right">Rows <br />&nbsp;</TableHead>
+        <TableHead className="w-[120px] text-right">Duration <br />&nbsp;</TableHead>
+        <TableHead className="w-[150px]">Exported By <br />&nbsp;</TableHead>
+        <TableHead className="w-[120px]">Actions <br />&nbsp;</TableHead>
       </TableRow>
               </TableHeader>
 
@@ -270,12 +270,12 @@ export default function FinanceReportCodRefund() {
                   files.map((file) => (
                     <TableRow key={file.id}>
                       <TableCell>{file.filename}</TableCell>
+                      <TableCell>{file.report_date}</TableCell>
                       <TableCell>
 {file.created_at? format(new Date(file.created_at), "yyyy-MM-dd")
                                                   : "-"}
 
                       </TableCell>
-                      <TableCell>{file.report_date}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {file.category}

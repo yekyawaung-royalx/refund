@@ -64,15 +64,24 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             // =========================================================
             if ($this->category === 'all' || $this->category === 'sender-pay-prepaid') {
 
-                // ✔ FIXED: id included properly (OPTION 1)
-                $sender = (clone $base)
-                    ->join('analytics as a', 'u.origin_branch', '=', 'a.reference')
-                    ->whereNotNull('a.journal')
+                // -------------------------
+                // IDs (FOR UPDATE ONLY)
+                // -------------------------
+                $senderIds = (clone $base)
                     ->where('u.payment_by', 'Sender Pay')
                     ->where('u.payment_type', 'Prepaid')
-                    ->select('u.id'); // ONLY ID for pluck
+                    ->pluck('u.id');
 
-                $senderData = (clone $sender)
+                // -------------------------
+                // DATA (FOR EXPORT ONLY)
+                // -------------------------
+                $senderData = DB::table('upload_data as u')
+                    ->join('analytics as a', 'u.origin_branch', '=', 'a.reference')
+                    ->whereDate('u.accounting_date', $this->accountingDate)
+                    ->where('u.sender_receiver_export', 0)
+                    ->where('u.payment_by', 'Sender Pay')
+                    ->where('u.payment_type', 'Prepaid')
+                    ->whereNotNull('a.journal')
                     ->select(
                         'u.origin_branch as branch',
                         'a.journal',
@@ -116,7 +125,8 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                 
 
                 // FIXED pluck
-                $ids = $ids->merge($sender->pluck('id'));
+                //$ids = $ids->merge($sender->pluck('id'));
+                $ids = $ids->merge($senderIds);
             }
 
             // =========================================================
@@ -124,15 +134,24 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             // =========================================================
             if ($this->category === 'all' || $this->category === 'receiver-pay-postpaid') {
 
-                // FIXED: id included properly (OPTION 1)
-                $receiver = (clone $base)
-                    ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
-                    ->whereNotNull('a.journal')
+                // -------------------------
+                // IDs (FOR UPDATE ONLY)
+                // -------------------------
+                $receiverIds = (clone $base)
                     ->where('u.payment_by', 'Receiver Pay')
                     ->where('u.payment_type', 'Postpaid')
-                    ->select('u.id'); // ONLY ID
+                    ->pluck('u.id');
 
-                $receiverData = (clone $receiver)
+                // -------------------------
+                // DATA (FOR EXPORT ONLY)
+                // -------------------------
+                $receiverData = DB::table('upload_data as u')
+                    ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
+                    ->whereDate('u.accounting_date', $this->accountingDate)
+                    ->where('u.sender_receiver_export', 0)
+                    ->where('u.payment_by', 'Receiver Pay')
+                    ->where('u.payment_type', 'Postpaid')
+                    ->whereNotNull('a.journal')
                     ->select(
                         'u.destination_branch as branch',
                         'a.journal',
@@ -175,7 +194,8 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                 }
                
                 // FIXED pluck
-                $ids = $ids->merge($receiver->pluck('id'));
+                //$ids = $ids->merge($receiver->pluck('id'));
+                $ids = $ids->merge($receiverIds);
             }
 
             $ids = $ids->unique()->values();
