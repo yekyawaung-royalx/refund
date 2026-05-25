@@ -279,16 +279,16 @@ export default function FinanceReportBranchDeposit() {
             <Table className="min-w-full table-fixed">
               <TableHeader>
                 <TableRow className="bg-green-500/20 border rounded-lg">
-        <TableHead className="w-[250px]">Filename<br />&nbsp;</TableHead>
-        <TableHead className="w-[120px]">Created <br /> Date</TableHead>
-        <TableHead className="w-[120px]">Accounting <br />Date</TableHead>
-        <TableHead className="w-[120px]">Category<br />&nbsp;</TableHead>
-        <TableHead className="w-[50px]">Filtered<br />&nbsp;</TableHead>
-        <TableHead className="w-[100px] text-right">Rows<br />&nbsp;</TableHead>
-        <TableHead className="w-[120px] text-right">Duration<br />&nbsp;</TableHead>
-        <TableHead className="w-[150px]">Exported By<br />&nbsp;</TableHead>
-        <TableHead className="w-[120px]">Actions<br />&nbsp;</TableHead>
-      </TableRow>
+                  <TableHead className="w-[250px]">Filename<br />&nbsp;</TableHead>
+                  <TableHead className="w-[120px]">Created <br /> Date</TableHead>
+                  <TableHead className="w-[120px]">Accounting <br />Date</TableHead>
+                  <TableHead className="w-[120px]">Category<br />&nbsp;</TableHead>
+                  <TableHead className="w-[50px]">Filtered<br />&nbsp;</TableHead>
+                  <TableHead className="w-[100px] text-right">Rows<br />&nbsp;</TableHead>
+                  <TableHead className="w-[120px] text-right">Duration<br />&nbsp;</TableHead>
+                  <TableHead className="w-[150px]">Exported By<br />&nbsp;</TableHead>
+                  <TableHead className="w-[120px]">Actions<br />&nbsp;</TableHead>
+                </TableRow>
               </TableHeader>
 
               <TableBody>

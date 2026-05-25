@@ -74,7 +74,6 @@ class ExportFileJob implements ShouldQueue
             }
 
             $partitionList = implode(',', $existingPartitions);
-
             // -----------------------------
             // Build export query
             // -----------------------------
@@ -83,6 +82,7 @@ class ExportFileJob implements ShouldQueue
                     id,
                     outbound_date,
                     accounting_date,
+                    delivered_date,
                     customer_reference_no,
                     customer,
                     waybill_no,

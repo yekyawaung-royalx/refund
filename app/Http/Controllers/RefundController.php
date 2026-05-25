@@ -347,10 +347,12 @@ class RefundController extends Controller
 
         $headers = array_shift($rows);
         
+        //return $rows;
+        //exit;
         return Inertia::render('refunds/ViewExportedFile', [
             'filename' => $filename,
             'headers' => $headers,
-            'rows' => $rows
+            'rows' => $rows ?? []
         ]);
     }
 

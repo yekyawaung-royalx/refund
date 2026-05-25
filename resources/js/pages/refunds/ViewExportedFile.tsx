@@ -27,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 interface PageProps extends InertiaPageProps {
   filename: string;
   headers: string[];
-  rows: string[][];
+  rows: unknown;
 }
 
 export default function View() {
@@ -38,16 +38,29 @@ export default function View() {
 
   const perPage = 200;
 
+  const safeRows = React.useMemo(() => {
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
+    return rows.filter(
+      (row): row is string[] =>
+        Array.isArray(row)
+    );
+  }, [rows]);
+
   // search filter
   const filteredRows = React.useMemo(() => {
-    if (!search) return rows;
+    if (!search) return safeRows;
 
-    return rows.filter((row) =>
+    return safeRows.filter((row) =>
       row.some((cell) =>
-        String(cell).toLowerCase().includes(search.toLowerCase())
+        String(cell)
+          .toLowerCase()
+          .includes(search.toLowerCase())
       )
     );
-  }, [search, rows]);
+  }, [search, safeRows]);
 
   // pagination
   const totalPages = Math.ceil(filteredRows.length / perPage);
