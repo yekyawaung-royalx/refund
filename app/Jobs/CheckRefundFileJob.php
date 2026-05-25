@@ -68,6 +68,15 @@ class CheckRefundFileJob implements ShouldQueue
 
             $paymentDate = $row[2];
             $waybillNo = $row[5];
+            $amountErrors = $this->validateAmountFormat($row, $rowNumber);
+
+            if (!empty($amountErrors)) {
+                foreach ($amountErrors as $error) {
+                    $errors[] = $error;
+                }
+
+                continue;
+            }
 
             if (!$paymentDate || !strtotime($paymentDate)) {
                 $errors[] = "Row {$rowNumber}: invalid payment date";
@@ -97,5 +106,36 @@ class CheckRefundFileJob implements ShouldQueue
             $this->filePath,
             $this->username
         )->onQueue('import');
+    }
+
+    private function hasInvalidAmountFormat($value): bool
+    {
+        if ($value === null || trim((string)$value) === '') {
+            return false;
+        }
+
+        return str_contains((string)$value, ',');
+    }
+
+    private function validateAmountFormat(array $row, int $rowNumber): array
+    {
+        $errors = [];
+
+        // Change index if refund amount column is different
+        $amountColumns = [
+            0 => 'Refund Amount',
+        ];
+
+        foreach ($amountColumns as $index => $label) {
+
+            $value = $row[$index] ?? null;
+
+            if ($this->hasInvalidAmountFormat($value)) {
+                $errors[] =
+                    "Row {$rowNumber}: {$label} has invalid amount format (comma not allowed)";
+            }
+        }
+
+        return $errors;
     }
 }

@@ -32,10 +32,10 @@ public function index(Request $request)
     // Accurate row count per partition (monthly)
     $rowCounts = DB::table('upload_data')
         ->selectRaw("
-            DATE_FORMAT(delivered_date, '%Y%m') as pname,
+            DATE_FORMAT(accounting_date, '%Y%m') as pname,
             COUNT(*) as total_rows
         ")
-        ->groupBy(DB::raw("DATE_FORMAT(delivered_date, '%Y%m')"))
+        ->groupBy(DB::raw("DATE_FORMAT(accounting_date, '%Y%m')"))
         ->get()
         ->keyBy('pname');
 

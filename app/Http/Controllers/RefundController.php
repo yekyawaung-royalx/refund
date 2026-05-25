@@ -31,21 +31,21 @@ class RefundController extends Controller
                 'total' => [
                     'all_time' => DB::table('upload_data')->count(),
                     'this_month' => DB::table('upload_data')
-                        ->whereBetween('delivered_date', [$startOfMonth, $endOfMonth])
+                        ->whereBetween('accounting_date', [$startOfMonth, $endOfMonth])
                         ->count(),
                 ],
                 'refund0' => [
                     'all_time' => DB::table('upload_data')->where('refund', 0)->count(),
                     'this_month' => DB::table('upload_data')
                         ->where('refund', 0)
-                        ->whereBetween('delivered_date', [$startOfMonth, $endOfMonth])
+                        ->whereBetween('accounting_date', [$startOfMonth, $endOfMonth])
                         ->count(),
                 ],
                 'refund1' => [
                     'all_time' => DB::table('upload_data')->where('refund', 1)->count(),
                     'this_month' => DB::table('upload_data')
                         ->where('refund', 1)
-                        ->whereBetween('delivered_date', [$startOfMonth, $endOfMonth])
+                        ->whereBetween('accounting_date', [$startOfMonth, $endOfMonth])
                         ->count(),
                 ],
             ];
@@ -69,21 +69,21 @@ class RefundController extends Controller
         // Total records
         $totalRecords = DB::table('upload_data')->count();
         $totalRecordsThisMonth = DB::table('upload_data')
-            ->whereBetween('delivered_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
             ->count();
 
         // Refund = 0
         $refund0Total = DB::table('upload_data')->where('refund', 0)->count();
         $refund0ThisMonth = DB::table('upload_data')
             ->where('refund', 0)
-            ->whereBetween('delivered_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
             ->count();
 
         // Refund = 1
         $refund1Total = DB::table('upload_data')->where('refund', 1)->count();
         $refund1ThisMonth = DB::table('upload_data')
             ->where('refund', 1)
-            ->whereBetween('delivered_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
             ->count();
 
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
@@ -120,6 +120,8 @@ class RefundController extends Controller
             : now()->endOfMonth();
 
         $category = $request->query('category', 'all'); // all | no-refund | refund
+        $payment_by = $request->query('payment_by', 'all'); // all | sender-pay | receiver-pay
+        $payment_type = $request->query('payment_type', 'all'); // all | prepaid | postpaid
 
         // Detect partitions
         $current = $from->copy()->startOfMonth();
@@ -133,7 +135,7 @@ class RefundController extends Controller
         }
 
         $query = DB::table('upload_data')
-            ->whereBetween('delivered_date', [$from, $to]);
+            ->whereBetween('accounting_date', [$from, $to]);
 
         // Category filter
         if ($category === 'no-refund') {
@@ -142,6 +144,23 @@ class RefundController extends Controller
 
         if ($category === 'refund') {
             $query->where('refund', 1);
+        }
+
+        // Payment By filter
+        if ($payment_by === 'sender-pay') {
+            $query->where('payment_by', 'Sender Pay');
+        }
+        if ($payment_by === 'receiver-pay') {
+            $query->where('payment_by', 'Receiver Pay');
+        }
+
+        // Payment Type filter
+        if ($payment_type === 'prepaid') {
+            $query->where('payment_type', 'Prepaid');
+        }
+
+        if ($payment_type === 'postpaid') {
+            $query->where('payment_type', 'Postpaid');
         }
 
         $refunds = $query
@@ -155,9 +174,11 @@ class RefundController extends Controller
             'execution_time_ms' => $executionTimeMs,
             'used_partitions'   => implode(', ', $usedPartitions),
             'results'           => $refunds,
-            'from' => $from->toDateString(),
-            'to'   => $to->toDateString(),
-            'category' => $category,
+            'from'              => $from->toDateString(),
+            'to'                => $to->toDateString(),
+            'category'          => $category,
+            'payment_by'        => $payment_by,
+            'payment_type'      => $payment_type,
         ]);
     }
 
@@ -415,8 +436,8 @@ class RefundController extends Controller
             $first = true;
 
             $query = DB::table('upload_data') // always main table
-                ->whereNotNull('delivered_date')
-                ->whereBetween('delivered_date', [$from->format('Y-m-d'), $to->format('Y-m-d')]);
+                ->whereNotNull('accounting_date')
+                ->whereBetween('accounting_date', [$from->format('Y-m-d'), $to->format('Y-m-d')]);
 
             if ($request->category && $request->category !== 'all') {
                 $query->where('refund', $request->category === 'refund' ? 1 : 0);

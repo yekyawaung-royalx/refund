@@ -1,5 +1,5 @@
 "use client";
-
+import { useState } from "react"
 import * as React from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {  CalendarIcon, Check, ChevronDown, Download, Search } from "lucide-react";
+import {  CalendarIcon, Check, ChevronDown, Download, Filter, Search } from "lucide-react";
 import AppLayout from "@/layouts/app-layout";
 import { type BreadcrumbItem } from "@/types";
 import { Head, usePage, router } from "@inertiajs/react";
@@ -139,7 +139,6 @@ function DateRangePicker({
 export default function UploadedData() {
   const { results, execution_time_ms, used_partitions, from, to, category } =
     usePage<UploadedDataPageProps>().props;
-
   const data: UploadDataItem[] = results?.data ?? [];
 
   const categories = [
@@ -147,10 +146,23 @@ export default function UploadedData() {
     { label: "No Refund", value: "no-refund" },
     { label: "Refund", value: "refund" },
   ];
+  const payment_by = [
+    { label: "All", value: "all" },
+    { label: "Sender Pay", value: "sender-pay" },
+    { label: "Receiver Pay", value: "receiver-pay" },
+  ];
+  const payment_type = [
+    { label: "All", value: "all" },
+    { label: "Prepaid", value: "prepaid" },
+    { label: "Postpaid", value: "postpaid" },
+  ];
 
+  const [filterOpen, setFilterOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = React.useState(
     category ?? "all"
   );
+  const [selectedPaymentBy, setSelectedPaymentBy] = React.useState("all");
+  const [selectedPaymentType, setSelectedPaymentType] = React.useState("all");;
 
   const allColumns: string[] = data.length > 0 ? Object.keys(data[0]) : [];
 
@@ -196,40 +208,22 @@ export default function UploadedData() {
                           </CardTitle>
 
             <div className="basis-3/5 flex justify-end items-center gap-2 flex-wrap">
-            // Vendor Type
-            // Refund Type
-            
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-[140px] justify-between flex items-center"
-                  >
-                    <span>{categories.find(c => c.value === selectedCategory)?.label}</span>
-                    <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
-                  </Button>
-                </PopoverTrigger>
-
-                <PopoverContent className="w-[140px] p-0">
-                  <Command>
-                    <CommandGroup>
-                      {categories.map((cat) => (
-                        <CommandItem key={cat.value} onSelect={() => setSelectedCategory(cat.value)}>
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedCategory === cat.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {cat.label}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
+              {/* Filter Accordion Button */}
+  <Button
+    variant="outline"
+    onClick={() => setFilterOpen(!filterOpen)}
+    className="flex items-center gap-2"
+  >
+    <Filter className="h-4 w-4" />
+    Filter
+    <ChevronDown
+      className={cn(
+        "h-4 w-4 transition-transform duration-300",
+        filterOpen && "rotate-180"
+      )}
+    />
+  </Button>
+              
               <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -252,8 +246,10 @@ export default function UploadedData() {
                         if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
                         if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
                         params.category = selectedCategory as string;
+                        params.payment_by = selectedPaymentBy as string;
+                        params.payment_type = selectedPaymentType as string;
 
-                        router.visit("/refunds/uploaded-data", { method: "get", data: params });
+                        router.visit("/refunds/uploaded-data", { method: "get", data: params,preserveState: true, preserveScroll: true, });
                       }}
                     >
                       <Search className="mr-2 h-4 w-4" />
@@ -267,6 +263,8 @@ export default function UploadedData() {
                         if (dateRange.from) params.from = format(dateRange.from, "yyyy-MM-dd");
                         if (dateRange.to) params.to = format(dateRange.to, "yyyy-MM-dd");
                         params.category = selectedCategory as string;
+                        params.payment_by = selectedPaymentBy as string;
+                        params.payment_type = selectedPaymentType as string;
                         const queryString = new URLSearchParams(params).toString();
 
                         window.location.href = `/refunds/uploaded-data/download?${queryString}`;
@@ -320,6 +318,135 @@ export default function UploadedData() {
           </CardHeader>
 
           <CardContent>
+            {/* Accordion Content */}
+            <div
+              className={cn(
+                "overflow-hidden transition-all duration-300 ease-in-out",
+                filterOpen ? "max-h-[500px] opacity-100 mt-4" : "max-h-0 opacity-0"
+              )}
+            >
+              <div className="w-full rounded-xl border bg-background/50 p-4">
+                
+                {/* Your Filters Here */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Payment By
+                    </label>
+                    <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between flex items-center"
+                              >
+                                <span>{payment_by.find(c => c.value === selectedPaymentBy)?.label}</span>
+                                <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
+                              </Button>
+                            </PopoverTrigger>
+
+                            <PopoverContent className="w-[140px] p-0">
+                              <Command>
+                                <CommandGroup>
+                                  {payment_by.map((cat) => (
+                                    <CommandItem key={cat.value} onSelect={() => setSelectedPaymentBy(cat.value)}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedPaymentBy === cat.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {cat.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Payment Type
+                    </label>
+                    <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between flex items-center"
+                              >
+                                <span>{payment_type.find(c => c.value === selectedPaymentType)?.label}</span>
+                                <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
+                              </Button>
+                            </PopoverTrigger>
+
+                            <PopoverContent className="w-[140px] p-0">
+                              <Command>
+                                <CommandGroup>
+                                  {payment_type.map((cat) => (
+                                    <CommandItem key={cat.value} onSelect={() => setSelectedPaymentType(cat.value)}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedPaymentType === cat.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {cat.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Refund Status
+                    </label>
+                    <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between flex items-center"
+                              >
+                                <span>{categories.find(c => c.value === selectedCategory)?.label}</span>
+                                <ChevronDown className="ml-2 h-4 w-4 opacity-70" />
+                              </Button>
+                            </PopoverTrigger>
+
+                            <PopoverContent className="w-[140px] p-0">
+                              <Command>
+                                <CommandGroup>
+                                  {categories.map((cat) => (
+                                    <CommandItem key={cat.value} onSelect={() => setSelectedCategory(cat.value)}>
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedCategory === cat.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {cat.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+
+                    
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Accounting Date
+                    </label>
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+                    
+                  </div>
+
+                  
+
+                </div>
+              </div>
+            </div>
             <Table>
   <TableHeader>
     <TableRow>

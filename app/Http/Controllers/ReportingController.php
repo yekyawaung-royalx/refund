@@ -40,7 +40,7 @@ class ReportingController extends Controller
 
         // Query (partition pruning auto works)
         $refunds = DB::table('upload_data')
-            ->whereBetween('delivered_date', [$from, $to])
+            ->whereBetween('accounting_date', [$from, $to])
             ->orderByDesc('outbound_date')
             ->paginate(200)
             ->withQueryString();
@@ -71,11 +71,11 @@ class ReportingController extends Controller
         $partition = 'P' . $date->format('Ym');
 
         $query = DB::table(DB::raw("upload_data PARTITION ($partition)"))
-            ->where('delivered_date', '>=', $date)
-            ->where('delivered_date', '<=', $endDate);
+            ->where('accounting_date', '>=', $date)
+            ->where('accounting_date', '<=', $endDate);
 
         $results = $query
-            ->orderByDesc('delivered_date')
+            ->orderByDesc('accounting_date')
             ->paginate(200)
             ->withQueryString();
 
@@ -192,7 +192,7 @@ class ReportingController extends Controller
     public function branches_deposit_export(Request $request)
     {
         // GET query parameters
-        $deliveredDate = $request->query('delivered_date');
+        $accountingDate = $request->query('accounting_date');
         $destinationBranch = $request->query('destination_branch');
         $category = $request->query('category');
 
@@ -200,7 +200,7 @@ class ReportingController extends Controller
         // Dispatch Job (Queue)
         // -------------------------
         // Category: all,cod-payable,cod-not-collect,cod-to-collect,cod-zero
-        GenerateFinanceBranchBankDepositJob::dispatch($deliveredDate, $destinationBranch, $category, $user = auth()->user()->name);
+        GenerateFinanceBranchBankDepositJob::dispatch($accountingDate, $destinationBranch, $category, $user = auth()->user()->name);
 
         // -------------------------
         // Response
@@ -209,7 +209,7 @@ class ReportingController extends Controller
             'status' => 'queued',
             'message' => 'Finance report job is processing in background',
             'data' => [
-                'delivered_date' => $deliveredDate,
+                'accounting_date' => $accountingDate,
                 'branch' => $destinationBranch,
             ]
         ]);

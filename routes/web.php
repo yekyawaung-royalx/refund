@@ -57,7 +57,6 @@ Route::get('/permissions', function () {
    return $permissions;
 });
 
-
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [RefundController::class, 'main_dashboard'])->name('dashboard');
     Route::get('/refunds', [RefundController::class, 'refund_dashboard'])->name('refunds.dashboard');
@@ -89,16 +88,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/refunds/uploaded-files/{id}', [UploadController::class, 'destroy']);
     Route::get('/reporting/search', [ReportingController::class, 'search']);
     Route::post('/users/{user}/permissions', [UserController::class, 'update_permissions']);
-
     Route::get('/analytics-accounts', [AnalyticsController::class, 'analytics_accounts']);
     Route::get('/analytics-accounts/create', [AnalyticsController::class, 'create_analytics_accounts']);
-    
     Route::get('/recent-activities', [UploadController::class, 'recent_activities']);
     Route::get('/recent-uploaded-files', [UploadController::class, 'recent_uploaded_files']);
     Route::get('/recent-exported-files', [UploadController::class, 'recent_exported_files']);
     Route::get('/recent-uploaded-data', [UploadController::class, 'recent_uploaded_data']);
     Route::get('/recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
-    
     
     /* Finance Report Routes */
     Route::get('/finance-report/branches-deposit', [ReportingController::class, 'finance_report_branches_deposit']);

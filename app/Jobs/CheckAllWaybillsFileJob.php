@@ -278,6 +278,11 @@ class CheckAllWaybillsFileJob implements ShouldQueue
         }
 
         $checks = $rule['checks'] ?? [];
+        $amountFormatErrors = $this->validateAmountFormats($row, $rowNumber);
+
+        if (!empty($amountFormatErrors)) {
+            $errors = array_merge($errors, $amountFormatErrors);
+        }
 
         if (($checks['origin_branch_required'] ?? false) && empty(trim($row[11] ?? ''))) {
             $errors[] = "Row {$rowNumber}: Origin Branch cannot be empty";
@@ -337,6 +342,40 @@ class CheckAllWaybillsFileJob implements ShouldQueue
         file_put_contents($filePath, implode("\n", $fixedLines));
     }
 
+    private function hasInvalidAmountFormat($value): bool
+    {
+        if ($value === null || trim((string)$value) === '') {
+            return false;
+        }
+
+        return str_contains((string)$value, ',');
+    }
+
+    private function validateAmountFormats(array $row, int $rowNumber): array
+    {
+        $errors = [];
+
+        $amountColumns = [
+            24 => 'Express Income Amount',
+            25 => 'COD Total Amount',
+            26 => 'COD Express Income Amount',
+            27 => 'COD Income Amount',
+            28 => 'COD Payable Amount',
+        ];
+
+        foreach ($amountColumns as $index => $label) {
+
+            $value = $row[$index] ?? null;
+
+            if ($this->hasInvalidAmountFormat($value)) {
+                $errors[] =
+                    "Row {$rowNumber}: {$label} has invalid amount format (comma not allowed)";
+            }
+        }
+
+        return $errors;
+    }
+
     private function normalize(string $value): string
     {
         return strtolower(trim($value));
@@ -345,7 +384,6 @@ class CheckAllWaybillsFileJob implements ShouldQueue
     private function getExpectedColumns(): int
     {
         //return $this->paymentRules[$this->category]['columns'] ?? 34;
-
         return match ($this->category) {
             'receiver-postpaid' => 33,
             'sender-prepaid'    => 33,

@@ -76,13 +76,13 @@ class ExportFileJob implements ShouldQueue
             $partitionList = implode(',', $existingPartitions);
 
             // -----------------------------
-            // ⚡ Build export query
+            // Build export query
             // -----------------------------
             $query = "
                 SELECT 
                     id,
                     outbound_date,
-                    delivered_date,
+                    accounting_date,
                     customer_reference_no,
                     customer,
                     waybill_no,
@@ -102,6 +102,8 @@ class ExportFileJob implements ShouldQueue
                     waybill_status
                 FROM upload_data PARTITION ({$partitionList})
                 WHERE refund = 0
+                    AND payment_by = 'Sender Pay'
+                    AND payment_type = 'Postpaid'
                 ORDER BY id
             ";
 
@@ -143,7 +145,7 @@ class ExportFileJob implements ShouldQueue
 
                 fputcsv($handle, [
                     $row->outbound_date,
-                    $row->delivered_date,
+                    $row->accounting_date,
                     $row->customer_reference_no,
                     $row->customer,
                     $row->waybill_no,
