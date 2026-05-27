@@ -302,7 +302,7 @@ class CheckAllWaybillsFileJob implements ShouldQueue
 
         if (($checks['cod_required'] ?? false)) {
             if ((float)($row[25] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Total Amount must be >= 0"; // 0,+
-            if ((float)($row[26] ?? 0) <= 0) $errors[] = "Row {$rowNumber}: COD Express Income must be > 0"; // >0
+            if ((float)($row[26] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Express Income must be >= 0"; // > 0,+
             if ((float)($row[27] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Income must be >= 0"; // 0,+
             if ((float)($row[28] ?? 0)  === '') $errors[] = "Row {$rowNumber}: COD Payable must not be empty"; // 0,+,-
         }
