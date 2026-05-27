@@ -182,7 +182,9 @@ class ProcessRefundChunkJob implements ShouldQueue
             DB::transaction(function () use ($valid) {
 
                 $tempTable = 'tmp_refund_' . $this->uploadId . '_' . now()->timestamp . '_' . random_int(1000, 9999);
-
+                
+                DB::statement("SET collation_connection = 'utf8mb4_unicode_ci'");
+                DB::statement("SET collation_server = 'utf8mb4_unicode_ci'");
                 DB::statement("
                     CREATE TEMPORARY TABLE $tempTable (
                         waybill_no VARCHAR(100)
@@ -206,7 +208,9 @@ class ProcessRefundChunkJob implements ShouldQueue
 
                 DB::statement("
                     UPDATE upload_data u
-                    JOIN $tempTable t ON u.waybill_no = t.waybill_no
+                    JOIN $tempTable t 
+                        ON u.waybill_no COLLATE utf8mb4_unicode_ci 
+                        = t.waybill_no COLLATE utf8mb4_unicode_ci
                     SET
                         u.refund = 1,
                         u.refund_id = ?,
