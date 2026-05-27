@@ -185,11 +185,21 @@ class ProcessRefundChunkJob implements ShouldQueue
 
                 DB::statement("
                     CREATE TEMPORARY TABLE $tempTable (
-                        waybill_no VARCHAR(100),
+                        waybill_no VARCHAR(100)
+                            CHARACTER SET utf8mb4
+                            COLLATE utf8mb4_unicode_ci,
+
                         payment_date DATE,
-                        vendor_type VARCHAR(20),
+
+                        vendor_type VARCHAR(20)
+                            CHARACTER SET utf8mb4
+                            COLLATE utf8mb4_unicode_ci,
+
                         UNIQUE KEY uq_waybill (waybill_no)
                     )
+                    ENGINE=InnoDB
+                    DEFAULT CHARSET=utf8mb4
+                    COLLATE=utf8mb4_unicode_ci
                 ");
 
                 DB::table($tempTable)->insertOrIgnore($valid);
