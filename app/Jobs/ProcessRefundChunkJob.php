@@ -197,9 +197,9 @@ class ProcessRefundChunkJob implements ShouldQueue
 
         if (!empty($valid)) {
 
-            DB::transaction(function () use ($valid) {
+            $tempTable = 'tmp_refund_' . $this->uploadId . '_' . now()->timestamp . '_' . random_int(1000, 9999);
 
-                $tempTable = 'tmp_refund_' . $this->uploadId . '_' . now()->timestamp . '_' . random_int(1000, 9999);
+            DB::transaction(function () use ($valid, $tempTable) {
 
                 DB::statement("
                     CREATE TEMPORARY TABLE `$tempTable` (
@@ -213,18 +213,6 @@ class ProcessRefundChunkJob implements ShouldQueue
                     COLLATE=utf8mb4_unicode_ci
                 ");
 
-                // DEBUG COLLATION CHECK
-                $collation = DB::select("
-                    SHOW FULL COLUMNS 
-                    FROM `$tempTable`
-                    WHERE Field = 'waybill_no'
-                ");
-
-                Log::info('Temp table collation', [
-                    'table' => $tempTable,
-                    'collation' => $collation
-                ]);
-
                 collect($valid)->chunk(1000)->each(fn ($chunk) =>
                     DB::table($tempTable)->insert($chunk->toArray())
                 );
@@ -232,7 +220,7 @@ class ProcessRefundChunkJob implements ShouldQueue
                 DB::statement("
                     UPDATE upload_data u
                     JOIN `$tempTable` t 
-                    ON BINARY u.waybill_no = BINARY t.waybill_no
+                        ON u.waybill_no = t.waybill_no
                     SET
                         u.refund = 1,
                         u.refund_id = ?,
@@ -240,6 +228,7 @@ class ProcessRefundChunkJob implements ShouldQueue
                         u.vendor_type = t.vendor_type
                     WHERE u.refund = 0
                 ", [$this->uploadId]);
+
             });
         }
 
