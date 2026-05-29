@@ -25,9 +25,32 @@ class UploadController extends Controller
         $request->validate([
             'title' => 'required|string',
             'category' => 'required|string',
-            'file' => 'required|mimes:csv,xlsx|max:81920'
+            'file' => [
+                'required',
+                'file',
+                'max:81920',
+                function ($attribute, $value, $fail) {
+                    $ext = strtolower($value->getClientOriginalExtension());
+
+                    if ($ext !== 'csv') {
+                        $fail('The file must be a CSV file.');
+                    }
+                },
+            ],
         ]);
 
+        /*
+        dd([
+            'file' => $request->file('file'),
+            'client_original_name' => $request->file('file')?->getClientOriginalName(),
+            'extension' => $request->file('file')?->getClientOriginalExtension(),
+            'mime_type' => $request->file('file')?->getMimeType(),
+            'server_mime_type' => $request->file('file')?->getMimeType(),
+            'size_kb' => $request->file('file')?->getSize() / 1024,
+        ]);
+        exit;
+        */
+        
         $waybillCategories = [
             'sender-postpaid',
             'sender-prepaid',
