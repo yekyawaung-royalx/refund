@@ -25,17 +25,18 @@ class ProcessRefundChunkJob implements ShouldQueue
 
     public function handle()
     {
+        $startTime = microtime(true);
+
         $processed = 0;
         $failed = 0;
 
         $failedRows = [];
-        $validRows = [];
-
-        $seen = [];
+        $validRows  = [];
+        $seen       = [];
 
         /**
          * =========================
-         * 1. ROW VALIDATION
+         * 1. VALIDATION
          * =========================
          */
         foreach ($this->rows as $row) {
@@ -51,7 +52,6 @@ class ProcessRefundChunkJob implements ShouldQueue
                     continue;
                 }
 
-                // duplicate inside file
                 if (isset($seen[$waybillNo])) {
                     $failed++;
                     $failedRows[] = $this->fail($row, 'duplicate_in_file');
@@ -92,27 +92,35 @@ class ProcessRefundChunkJob implements ShouldQueue
 
         /**
          * =========================
-         * 2. DB PROCESSING
+         * 2. DB PROCESS
          * =========================
          */
-        $dbResult = $this->processBatch($validRows, $failedRows);
+        $dbResult = $this->processBatch($validRows);
 
-        $processed = $dbResult['processed'];
-        $failed += $dbResult['failed_db'];
+        $processed += $dbResult['processed'];
+        $failed    += $dbResult['failed_db'];
 
         /**
          * =========================
-         * 3. SAVE FAILED FILE
+         * 3. INSERT FAILED LOGS (ONLY ONCE)
+         * =========================
+         */
+        if (!empty($failedRows)) {
+            DB::table('failed_logs')->insert($failedRows);
+        }
+
+        /**
+         * =========================
+         * 4. SAVE FAILED FILE
          * =========================
          */
         $failedPath = $this->saveFailedFile($failedRows);
 
         /**
          * =========================
-         * 4. UPDATE UPLOAD TABLE
+         * 5. UPDATE UPLOAD TABLE
          * =========================
          */
-
         DB::table('uploads')
             ->where('id', $this->uploadId)
             ->increment('processed_rows', $processed);
@@ -130,23 +138,21 @@ class ProcessRefundChunkJob implements ShouldQueue
             ->where('id', $this->uploadId)
             ->value('total_rows');
 
-        $status = ($done >= $total) ? 'completed' : 'processing';
-
         DB::table('uploads')
             ->where('id', $this->uploadId)
             ->update([
-                'total_rows' => $total,
-                'status' => $status,
+                'status' => ($done >= $total) ? 'completed' : 'processing',
+                'processed_duration' => round(microtime(true) - $startTime, 2),
                 'failed_path' => $failedPath,
             ]);
     }
 
     /**
      * =========================
-     * DB BATCH PROCESS
+     * DB PROCESS
      * =========================
      */
-    private function processBatch(array $rows, array &$failedRows): array
+    private function processBatch(array $rows): array
     {
         if (empty($rows)) {
             return ['processed' => 0, 'failed_db' => 0];
@@ -154,12 +160,10 @@ class ProcessRefundChunkJob implements ShouldQueue
 
         $waybills = array_column($rows, 'waybill_no');
 
-        // only existing & not refunded
-        $existing = DB::table('upload_data')
+        $records = DB::table('upload_data')
             ->whereIn('waybill_no', $waybills)
-            ->where('refund', 0)
-            ->pluck('waybill_no')
-            ->flip();
+            ->get()
+            ->keyBy('waybill_no');
 
         $valid = [];
         $failedDb = 0;
@@ -168,9 +172,23 @@ class ProcessRefundChunkJob implements ShouldQueue
 
             $wb = $row['waybill_no'];
 
-            if (!isset($existing[$wb])) {
+            if (!isset($records[$wb])) {
                 $failedDb++;
-                $failedRows[] = $this->fail(['waybill_no' => $wb], 'not_found');
+                DB::table('failed_logs')->insert([
+                    'upload_id' => $this->uploadId,
+                    'waybill_no' => $wb,
+                    'reason' => 'not_found',
+                ]);
+                continue;
+            }
+
+            if ((int)$records[$wb]->refund === 1) {
+                $failedDb++;
+                DB::table('failed_logs')->insert([
+                    'upload_id' => $this->uploadId,
+                    'waybill_no' => $wb,
+                    'reason' => 'already_refunded',
+                ]);
                 continue;
             }
 
@@ -182,19 +200,12 @@ class ProcessRefundChunkJob implements ShouldQueue
             DB::transaction(function () use ($valid) {
 
                 $tempTable = 'tmp_refund_' . $this->uploadId . '_' . now()->timestamp . '_' . random_int(1000, 9999);
-                
+
                 DB::statement("
-                    CREATE TEMPORARY TABLE $tempTable (
-                        waybill_no VARCHAR(100)
-                            CHARACTER SET utf8mb4
-                            COLLATE utf8mb4_unicode_ci,
-
+                    CREATE TEMPORARY TABLE `$tempTable` (
+                        waybill_no VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
                         payment_date DATE,
-
-                        vendor_type VARCHAR(20)
-                            CHARACTER SET utf8mb4
-                            COLLATE utf8mb4_unicode_ci,
-
+                        vendor_type VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
                         UNIQUE KEY uq_waybill (waybill_no)
                     )
                     ENGINE=InnoDB
@@ -202,13 +213,26 @@ class ProcessRefundChunkJob implements ShouldQueue
                     COLLATE=utf8mb4_unicode_ci
                 ");
 
-                DB::table($tempTable)->insertOrIgnore($valid);
+                // DEBUG COLLATION CHECK
+                $collation = DB::select("
+                    SHOW FULL COLUMNS 
+                    FROM `$tempTable`
+                    WHERE Field = 'waybill_no'
+                ");
+
+                Log::info('Temp table collation', [
+                    'table' => $tempTable,
+                    'collation' => $collation
+                ]);
+
+                collect($valid)->chunk(1000)->each(fn ($chunk) =>
+                    DB::table($tempTable)->insert($chunk->toArray())
+                );
 
                 DB::statement("
                     UPDATE upload_data u
-                    JOIN $tempTable t 
-                        ON u.waybill_no COLLATE utf8mb4_unicode_ci 
-                        = t.waybill_no
+                    JOIN `$tempTable` t 
+                    ON BINARY u.waybill_no = BINARY t.waybill_no
                     SET
                         u.refund = 1,
                         u.refund_id = ?,
@@ -227,23 +251,18 @@ class ProcessRefundChunkJob implements ShouldQueue
 
     /**
      * =========================
-     * FAILED FORMAT
+     * HELPERS
      * =========================
      */
     private function fail(array $row, string $reason): array
     {
         return [
-            'upload_id'  => $this->uploadId,
-            'waybill_no' => $row['waybill_no'] ?? $row[5] ?? null,
-            'reason'     => $reason,
+            'upload_id' => $this->uploadId,
+            'waybill_no' => $row[5] ?? null,
+            'reason' => $reason,
         ];
     }
 
-    /**
-     * =========================
-     * SAVE FAILED CSV
-     * =========================
-     */
     private function saveFailedFile(array $failedRows): ?string
     {
         if (empty($failedRows)) return null;
@@ -251,9 +270,7 @@ class ProcessRefundChunkJob implements ShouldQueue
         $folder = now()->format('Y-m');
         $dir = storage_path("app/private/upload-failed/{$folder}");
 
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
 
         $file = "{$dir}/failed_{$this->uploadId}_" . time() . ".csv";
 
@@ -261,11 +278,7 @@ class ProcessRefundChunkJob implements ShouldQueue
         fputcsv($handle, ['upload_id', 'waybill_no', 'reason']);
 
         foreach ($failedRows as $row) {
-            fputcsv($handle, [
-                $row['upload_id'],
-                $row['waybill_no'],
-                $row['reason']
-            ]);
+            fputcsv($handle, $row);
         }
 
         fclose($handle);

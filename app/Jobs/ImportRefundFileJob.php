@@ -7,6 +7,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use App\Jobs\ExportFailedLogsJob;
 
 class ImportRefundFileJob implements ShouldQueue
 {
@@ -68,5 +69,8 @@ class ImportRefundFileJob implements ShouldQueue
             ->update([
                 'total_rows' => $index
             ]);
+
+        // EXPORT FAILED LOGS AFTER ALL CHUNKS
+        ExportFailedLogsJob::dispatch($this->uploadId)->delay(now()->addMinutes(2));
     }
 }

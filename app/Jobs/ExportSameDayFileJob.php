@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 
-class ExportFileJob implements ShouldQueue
+class ExportSameDayFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -42,6 +42,7 @@ class ExportFileJob implements ShouldQueue
         $exportId = DB::table('exports')->insertGetId([
             'filename' => $fileName,
             'filepath' => '',
+            'service_type' => 'same-day-delivery',
             'total_rows' => 0,
             'start_datetime' => $startDt,
             'end_datetime' => $startDt,
@@ -104,6 +105,7 @@ class ExportFileJob implements ShouldQueue
                 WHERE refund = 0
                     AND payment_by = 'Sender Pay'
                     AND payment_type = 'Postpaid'
+                    AND service_type = 'same_day_delivery'
                 ORDER BY id
             ";
 
@@ -209,7 +211,7 @@ class ExportFileJob implements ShouldQueue
 
             Log::info("Export completed: {$filePath} | Rows: {$count} | Duration: {$duration}s");
             
-            DailyRefundSummaryJob::dispatch($exportId, $count, null, null);
+            //DailyRefundSummaryJob::dispatch($exportId, $count, null, null);
             // -----------------------------
             // Notify user
             // -----------------------------

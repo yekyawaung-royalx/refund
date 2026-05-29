@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Artisan;
 use App\Jobs\FollowUpCheckAnalyticBranchJob;
 use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use App\Jobs\ExportFileJob;
+use App\Jobs\ExportExpressFileJob;
+use App\Jobs\ExportSameDayFileJob;
 
 class RefundController extends Controller
 {
@@ -283,11 +284,8 @@ class RefundController extends Controller
     public function exported_file(Request $request){
         $date = $request->input('date', now()->format('Ym'));
 
-        // console command ကို call
-        // Artisan::call('export:daily', [
-        //     'date' => $date,
-        // ]);
-        ExportFileJob::dispatch($date);
+        ExportExpressFileJob::dispatch($date);
+        ExportSameDayFileJob::dispatch($date);
 
         return response()->json([
             'message' => 'Export started successfully.'

@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Jobs\ExportFileJob;
+use App\Jobs\ExportExpressFileJob;
+use App\Jobs\ExportSameDayFileJob;
 
 class ExportDailyData extends Command
 {
@@ -14,7 +16,8 @@ class ExportDailyData extends Command
     {
         $date = $this->argument('date');
 
-        (new ExportFileJob($date))->handle();
+        (new ExportExpressFileJob($date))->handle();
+        (new ExportSameDayFileJob($date))->handle();
 
         $this->info('Export completed.');
     }

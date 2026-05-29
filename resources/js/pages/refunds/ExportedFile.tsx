@@ -35,6 +35,7 @@ import { toast } from "sonner";
 export interface ExportFile {
   id: number;
   filename: string;
+  service_type: string;
   total_rows?: number;
   created_at?: string;
   start_datetime?: string;
@@ -178,6 +179,7 @@ export default function ExportedFile() {
                   <TableHead>ID</TableHead>
                   <TableHead>Exported Date</TableHead>
                   <TableHead>Filename</TableHead>
+                  <TableHead>Service Type</TableHead>
                   <TableHead>Total Rows</TableHead>
                   <TableHead>Start Time</TableHead>
                   <TableHead>End Time</TableHead>
@@ -194,6 +196,13 @@ export default function ExportedFile() {
                       <TableCell>{item.id}</TableCell>
                       <TableCell>{item.created_at ? format(new Date(item.created_at), "yyyy-MM-dd") : "-"}</TableCell>
                       <TableCell className="truncate max-w-[200px]">{item.filename}</TableCell>
+                      <TableCell>
+                        {item.service_type && (
+                        <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
+                           {item.service_type}
+                        </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{display(item.total_rows?.toLocaleString())}</TableCell>
                       <TableCell>{item.start_datetime ? format(new Date(item.start_datetime), "HH:mm:ss") : "-"}s</TableCell>
                       <TableCell>{item.end_datetime ? format(new Date(item.end_datetime), "HH:mm:ss") : "-"}s</TableCell>
