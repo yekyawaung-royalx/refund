@@ -213,7 +213,7 @@ class ProcessRefundChunkJob implements ShouldQueue
                     COLLATE=utf8mb4_unicode_ci
                 ");
 
-                collect($valid)->chunk(1000)->each(fn ($chunk) =>
+                collect($valid)->chunk(500)->each(fn ($chunk) =>
                     DB::table($tempTable)->insert($chunk->toArray())
                 );
 
