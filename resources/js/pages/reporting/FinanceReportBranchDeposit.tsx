@@ -191,7 +191,7 @@ export default function FinanceReportBranchDeposit() {
   const handleExport = async () => {
     try {
       const query = new URLSearchParams({
-        delivered_date: date ? format(date, "yyyy-MM-dd") : "",
+        accounting_date: date ? format(date, "yyyy-MM-dd") : "",
         destination_branch: destinationBranch !== "ALL" ? destinationBranch! : "",
         category: category !== "ALL" ? category! : "",
       }).toString();
@@ -232,7 +232,7 @@ export default function FinanceReportBranchDeposit() {
             <div className="grid grid-cols-4 gap-4">
               {/* Date */}
               <div className="flex flex-col gap-1">
-                <Label>Delivered Date</Label>
+                <Label>Accounting Date</Label>
                 <SingleDatePicker value={date} onChange={setDate} />
               </div>
 

@@ -13,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-    protected string $deliveredDate;
+    protected string $accountingDate;
     protected ?string $branch;
     protected ?string $category; // all,cod-payable,cod-not-collect,cod-to-collect,cod-zero
     protected string $exportedBy;
@@ -21,9 +21,9 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
     public $timeout = 1800;
     public $tries = 3;
 
-    public function __construct(string $deliveredDate, ?string $branch = null, ?string $category = 'all', string $exportedBy)
+    public function __construct(string $accountingDate, ?string $branch = null, ?string $category = 'all', string $exportedBy)
     {
-        $this->deliveredDate = $deliveredDate;
+        $this->accountingDate = $accountingDate;
         $this->branch        = $branch;
         $this->category      = $category ?? 'all';
         $this->exportedBy    = $exportedBy;
@@ -72,7 +72,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 
                 $query = DB::table('upload_data as u')
                     ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
-                    ->whereDate('u.delivered_date', $this->deliveredDate)
+                    ->whereDate('u.accounting_date', $this->accountingDate)
                     ->whereNotNull('a.journal')
                     ->where('u.branch_bank_deposit_export', 0);
 
@@ -99,12 +99,12 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 
                 foreach ($results as $row) {
                     $journalValue   = $isFirstRow ? $journalCode : null;
-                    $deliveredDate  = $isFirstRow ? $this->deliveredDate : null;
+                    $accountingDate  = $isFirstRow ? $this->accountingDate : null;
                     $codPayable     = $row->cod_payable ?? 0;
 
                     $insertData[] = [
                         'journal' => $journalValue,
-                        'delivered_date' => $deliveredDate,
+                        'accounting_date' => $accountingDate,
                         'ref' => null,
                         'analytic' => $row->reference,
                         'account' => '506030',
@@ -116,7 +116,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     ];
                     $insertData[] = [
                         'journal' => null,
-                        'delivered_date' => null,
+                        'accounting_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
                         'account' => '506032',
@@ -128,7 +128,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     ];
                     $insertData[] = [
                         'journal' => null,
-                        'delivered_date' => null,
+                        'accounting_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
                         'account' => $codPayable >= 0 ? '355003' : '272750', // 355003 for +, 272750 for -
@@ -140,7 +140,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     ];
                     $insertData[] = [
                         'journal' => null,
-                        'delivered_date' => null,
+                        'accounting_date' => null,
                         'ref' => null,
                         'analytic' => $row->reference,
                         'account' => $row->journal,
@@ -162,12 +162,12 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     'action'     => 'EXPORT',
                     'keywords'   => 'BRANCH_BANK_DEPOSIT',
                     'user'       => $this->exportedBy,
-                    'log'        => "No data found for {$this->deliveredDate}",
+                    'log'        => "No data found for {$this->accountingDate}",
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
 
-                Log::info("No data found for {$this->deliveredDate}");
+                Log::info("No data found for {$this->accountingDate}");
                 return;
             }
 
@@ -176,7 +176,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             // -----------------------------
             $folder = now()->format('Y-m');
             $timestamp = now()->format('Ymd_His');
-            $fileName = "branches-depoit-{$this->deliveredDate}-{$timestamp}.csv";
+            $fileName = "branches-depoit-{$this->accountingDate}-{$timestamp}.csv";
             $relativePath = "private/finance-reports/{$folder}/{$fileName}";
 
             $directory = storage_path("app/private/finance-reports/{$folder}");
@@ -187,7 +187,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 
             fputcsv($handle, [
                 'journal',
-                'delivered_date',
+                'accounting_date',
                 'ref',
                 'analytic',
                 'account',
@@ -201,7 +201,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             foreach ($insertData as $row) {
                 fputcsv($handle, [
                     $row['journal'],
-                    $row['delivered_date'],
+                    $row['accounting_date'],
                     $row['ref'],
                     $row['analytic'],
                     $row['account'],
@@ -222,7 +222,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             $financeExportId = DB::table('finance_exports')->insertGetId([
                 'filename' => $fileName,
                 'filepath' => $relativePath,
-                'report_date' => $this->deliveredDate,
+                'report_date' => $this->accountingDate,
                 'report_type' => 'branches-deposit',
                 'category' => $this->category,
                 'filtered' => $this->category ?? 'ALL',
@@ -239,7 +239,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             foreach ($selectedCategories as $categoryName => $condition) {
                 $query = DB::table('upload_data as u')
                     ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
-                    ->whereDate('u.delivered_date', $this->deliveredDate)
+                    ->whereDate('u.accounting_date', $this->accountingDate)
                     ->whereNotNull('a.journal');
 
                 if ($this->branch && $this->branch !== 'ALL') {
@@ -262,14 +262,14 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                 'action'     => 'EXPORT',
                 'keywords'   => 'BRANCH_BANK_DEPOSIT',
                 'user'       => $this->exportedBy,
-                'log'        => "Branch Bank Deposit report generated. Delivered Date: {$this->deliveredDate}, Exported File Name: {$fileName}, Row Count: " . count($insertData),
+                'log'        => "Branch Bank Deposit report generated. Accounting Date: {$this->accountingDate}, Exported File Name: {$fileName}, Row Count: " . count($insertData),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             Log::info(
                 "Branch Bank Deposit Report Generated | " .
-                "Delivered Date: {$this->deliveredDate} | " .
+                "Accounting Date: {$this->accountingDate} | " .
                 "Exported File Name: {$fileName} | " .
                 "Row Count: " . count($insertData)
             );
