@@ -10,14 +10,12 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Mail;
 
 class ExportExpressFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected string $yearMonth;
-    protected int $batchSize = 5000; // batch size for updating export_id
 
     public function __construct(?string $yearMonth = null)
     {
@@ -26,15 +24,10 @@ class ExportExpressFileJob implements ShouldQueue
 
     public function handle()
     {
-        // -----------------------------
-        // Start timer for performance measurement
-        // -----------------------------
         $startTime = microtime(true);
         $startDt = Carbon::now();
 
-        $timestamp = now()->timestamp;
-        $today = Carbon::now()->format('Ymd-His');
-        $fileName = "export-{$today}.csv";
+        $fileName = "export-" . now()->format('Ymd-His') . ".csv";
 
         // -----------------------------
         // Create export record
@@ -55,12 +48,12 @@ class ExportExpressFileJob implements ShouldQueue
         try {
 
             // -----------------------------
-            // Determine partitions
+            // Partition selection
             // -----------------------------
             $current = Carbon::createFromFormat('Ym', $this->yearMonth);
 
             $partitions = collect(range(0, 2))
-                ->map(fn($i) => "P" . $current->copy()->subMonths($i)->format('Ym'))
+                ->map(fn ($i) => "P" . $current->copy()->subMonths($i)->format('Ym'))
                 ->toArray();
 
             $existingPartitions = DB::table('information_schema.PARTITIONS')
@@ -75,8 +68,9 @@ class ExportExpressFileJob implements ShouldQueue
             }
 
             $partitionList = implode(',', $existingPartitions);
+
             // -----------------------------
-            // Build export query
+            // Query (IMPORTANT: no ORDER BY needed for speed)
             // -----------------------------
             $query = "
                 SELECT 
@@ -106,30 +100,29 @@ class ExportExpressFileJob implements ShouldQueue
                     AND payment_by = 'Sender Pay'
                     AND payment_type = 'Postpaid'
                     AND service_type = 'express'
-                ORDER BY id
+                    AND export_id IS NULL
             ";
 
             // -----------------------------
-            // Prepare export file path
+            // File setup
             // -----------------------------
             $folder = $current->format('Y-m');
-            $directory = storage_path("app/private/exports/{$folder}");
+            $timestamp = now()->format('Ymd_His');
+            $today = Carbon::now()->format('Ymd-His');
+            $fileName = "export-express-{$today}-{$timestamp}.csv";
+            $relativePath = "private/exports/{$folder}/{$fileName}";
 
-            if (!is_dir($directory)) {
-                if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
-                    throw new \Exception("Failed to create directory: {$directory}");
-                }
+            $directory = storage_path("app/private/exports/{$folder}");
+           if (!is_dir($directory)) mkdir($directory, 0755, true);
+
+            $filePath = "{$directory}/{$fileName}";
+            $handle = fopen($filePath, 'w');
+
+            if (!$handle) {
+                throw new \Exception("Cannot create file");
             }
 
-            $relativePath = "private/exports/{$folder}/{$fileName}";
-            $filePath = storage_path("app/{$relativePath}");
-
-            $handle = fopen($filePath, 'w');
-            if (!$handle) throw new \Exception("Unable to create export file");
-
-            // -----------------------------
-            // Write CSV header
-            // -----------------------------
+            // CSV header
             fputcsv($handle, [
                 'Outbound Date','Accounting Date','Sender/Internal Reference','Sender/Display Name',
                 'Waybill No','From Analytic Account','To Analytic Account','Receiver Name',
@@ -138,14 +131,16 @@ class ExportExpressFileJob implements ShouldQueue
             ]);
 
             $count = 0;
-            $rowIds = [];
 
             // -----------------------------
-            // Cursor-based export (memory-efficient)
+            // BUFFER STREAM (RAM SAFE)
             // -----------------------------
+            $buffer = [];
+            $bufferSize = 2000;
+
             foreach (DB::cursor($query) as $row) {
 
-                fputcsv($handle, [
+                $buffer[] = [
                     $row->outbound_date,
                     $row->accounting_date,
                     $row->customer_reference_no,
@@ -166,90 +161,67 @@ class ExportExpressFileJob implements ShouldQueue
                     $row->to_city,
                     $row->service_type,
                     $row->waybill_status
-                ]);
+                ];
 
-                $rowIds[] = $row->id;
                 $count++;
 
-                // -----------------------------
-                // Batch update export_id in transaction
-                // -----------------------------
-                if ($count % $this->batchSize === 0) {
-                    DB::transaction(function() use ($rowIds, $exportId) {
-                        DB::table('upload_data')->whereIn('id', $rowIds)->update(['export_id' => $exportId]);
-                    });
-                    $rowIds = [];
+                if (count($buffer) >= $bufferSize) {
+                    foreach ($buffer as $line) {
+                        fputcsv($handle, $line);
+                    }
+                    $buffer = [];
+
                     fflush($handle);
                 }
             }
 
-            // -----------------------------
-            // Update remaining rows
-            // -----------------------------
-            if (!empty($rowIds)) {
-                DB::transaction(function() use ($rowIds, $exportId) {
-                    DB::table('upload_data')->whereIn('id', $rowIds)->update(['export_id' => $exportId]);
-                });
+            // flush remaining
+            foreach ($buffer as $line) {
+                fputcsv($handle, $line);
             }
 
             fclose($handle);
 
             // -----------------------------
-            // Finalize export record
+            // ONE-TIME BULK UPDATE (FAST)
+            // -----------------------------
+            DB::statement("
+                UPDATE upload_data PARTITION ({$partitionList})
+                SET export_id = ?
+                WHERE refund = 0
+                    AND payment_by = 'Sender Pay'
+                    AND payment_type = 'Postpaid'
+                    AND service_type = 'express'
+                    AND export_id IS NULL
+            ", [$exportId]);
+
+            // -----------------------------
+            // Finalize
             // -----------------------------
             $endTime = microtime(true);
             $duration = round($endTime - $startTime, 2);
-            $endDt = Carbon::now();
 
             DB::table('exports')->where('id', $exportId)->update([
                 'filepath' => $relativePath,
                 'total_rows' => $count,
-                'end_datetime' => $endDt,
+                'end_datetime' => now(),
                 'duration' => $duration . 's',
                 'updated_at' => now(),
             ]);
 
-            Log::info("Export completed: {$filePath} | Rows: {$count} | Duration: {$duration}s");
-            
-            //DailyRefundSummaryJob::dispatch($exportId, $count, null, null);
-            // -----------------------------
-            // Notify user
-            // -----------------------------
-            Mail::to('yekyawaung1991@gmail.com')
-                ->queue(new \App\Mail\ExportCompletedMail(
-                    $this->yearMonth,
-                    $count,
-                    $duration,
-                    $fileName,
-                    $startDt->toDateTimeString(),
-                    $endDt->toDateTimeString()
-                ));
+            Log::info("Export completed | Rows: {$count} | Time: {$duration}s");
 
         } catch (\Throwable $e) {
-            // -----------------------------
-            // Error handling
-            // -----------------------------
-            $endTime = microtime(true);
-            $duration = round($endTime - $startTime, 2);
-            $endDt = Carbon::now();
 
             DB::table('exports')->where('id', $exportId)->update([
-                'end_datetime' => $endDt,
-                'duration' => $duration . 's',
+                'end_datetime' => now(),
+                'duration' => (microtime(true) - $startTime) . 's',
                 'error_message' => $e->getMessage(),
                 'updated_at' => now(),
             ]);
 
-            // update refund summary table
-            // DB::table('refund_summaries')->insert([
-            //     'payment_date' => '',
-            //     'to_refund_amount' => '',
-            //     'to_refund_rows' => $count,
-            //     'created_at' => now(),
-            //     'updated_at' => now(),
-            // ]);
-
             Log::error("Export failed: " . $e->getMessage());
+
             throw $e;
         }
     }
