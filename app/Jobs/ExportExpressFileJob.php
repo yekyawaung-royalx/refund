@@ -27,7 +27,7 @@ class ExportExpressFileJob implements ShouldQueue
         $startTime = microtime(true);
         $startDt = Carbon::now();
 
-        $fileName = "export-" . now()->format('Ymd-His') . ".csv";
+        $fileName = "export-express-" . now()->format('Ymd-His') . ".csv";
 
         // -----------------------------
         // Create export record
@@ -107,17 +107,16 @@ class ExportExpressFileJob implements ShouldQueue
             // File setup
             // -----------------------------
             $folder = $current->format('Y-m');
-            $timestamp = now()->format('Ymd_His');
-            $today = Carbon::now()->format('Ymd-His');
-            $fileName = "export-express-{$today}-{$timestamp}.csv";
-            $relativePath = "private/exports/{$folder}/{$fileName}";
-
             $directory = storage_path("app/private/exports/{$folder}");
-           if (!is_dir($directory)) mkdir($directory, 0755, true);
 
-            $filePath = "{$directory}/{$fileName}";
+            if (!is_dir($directory)) {
+                mkdir($directory, 0775, true);
+            }
+
+            $relativePath = "private/exports/{$folder}/{$fileName}";
+            $filePath = storage_path("app/{$relativePath}");
+
             $handle = fopen($filePath, 'w');
-
             if (!$handle) {
                 throw new \Exception("Cannot create file");
             }
