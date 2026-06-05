@@ -100,7 +100,7 @@ class ExportExpressFileJob implements ShouldQueue
                     AND payment_by = 'Sender Pay'
                     AND payment_type = 'Postpaid'
                     AND service_type = 'express'
-                    AND export_id IS NULL
+                ORDER BY id
             ";
 
             // -----------------------------
@@ -191,8 +191,9 @@ class ExportExpressFileJob implements ShouldQueue
                     AND payment_by = 'Sender Pay'
                     AND payment_type = 'Postpaid'
                     AND service_type = 'express'
-                    AND export_id IS NULL
+                    AND export_id = $exportId
             ", [$exportId]);
+            Log::info("Export ID | {$exportId}");
 
             // -----------------------------
             // Finalize
