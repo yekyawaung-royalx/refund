@@ -26,11 +26,53 @@ class ExportExpressFileJob implements ShouldQueue
     {
         $startTime = microtime(true);
         $startDt = Carbon::now();
+        $exportStartedAt = Carbon::now();
 
         $fileName = "export-express-" . now()->format('Ymd-His') . ".csv";
 
         // -----------------------------
-        // Create export record
+        // Partition selection
+        // -----------------------------
+        $current = Carbon::createFromFormat('Ym', $this->yearMonth);
+
+        $partitions = collect(range(0, 2))
+            ->map(fn ($i) => "P" . $current->copy()->subMonths($i)->format('Ym'))
+            ->toArray();
+
+        $existingPartitions = DB::table('information_schema.PARTITIONS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', 'upload_data')
+            ->whereIn('PARTITION_NAME', $partitions)
+            ->pluck('PARTITION_NAME')
+            ->toArray();
+
+        if (empty($existingPartitions)) {
+            throw new \Exception("Required partitions not found");
+        }
+
+        $partitionList = implode(',', $existingPartitions);
+
+        // -----------------------------
+        // STEP 1: COUNT FIRST (UX SAFE)
+        // -----------------------------
+        $countQuery = "
+            SELECT COUNT(*) as total
+            FROM upload_data PARTITION ({$partitionList})
+            WHERE refund = 0
+                AND payment_by = 'Sender Pay'
+                AND payment_type = 'Postpaid'
+                AND service_type = 'express'
+        ";
+
+        $totalRows = DB::selectOne($countQuery)->total;
+
+        if ($totalRows == 0) {
+            Log::info("Export skipped (no data found)");
+            return;
+        }
+
+        // -----------------------------
+        // STEP 2: CREATE EXPORT RECORD ONLY IF DATA EXISTS
         // -----------------------------
         $exportId = DB::table('exports')->insertGetId([
             'filename' => $fileName,
@@ -48,63 +90,7 @@ class ExportExpressFileJob implements ShouldQueue
         try {
 
             // -----------------------------
-            // Partition selection
-            // -----------------------------
-            $current = Carbon::createFromFormat('Ym', $this->yearMonth);
-
-            $partitions = collect(range(0, 2))
-                ->map(fn ($i) => "P" . $current->copy()->subMonths($i)->format('Ym'))
-                ->toArray();
-
-            $existingPartitions = DB::table('information_schema.PARTITIONS')
-                ->where('TABLE_SCHEMA', DB::getDatabaseName())
-                ->where('TABLE_NAME', 'upload_data')
-                ->whereIn('PARTITION_NAME', $partitions)
-                ->pluck('PARTITION_NAME')
-                ->toArray();
-
-            if (empty($existingPartitions)) {
-                throw new \Exception("Required partitions not found");
-            }
-
-            $partitionList = implode(',', $existingPartitions);
-
-            // -----------------------------
-            // Query (IMPORTANT: no ORDER BY needed for speed)
-            // -----------------------------
-            $query = "
-                SELECT 
-                    id,
-                    outbound_date,
-                    accounting_date,
-                    delivered_date,
-                    customer_reference_no,
-                    customer,
-                    waybill_no,
-                    from_analytic_account,
-                    to_analytic_account,
-                    receiver_name,
-                    weight,
-                    cod_total_amount,
-                    express_income_amount,
-                    cod_express_income_amount,
-                    cod_income_amount,
-                    cod_payable_amount,
-                    confirm_date,
-                    from_city,
-                    to_city,
-                    service_type,
-                    waybill_status
-                FROM upload_data PARTITION ({$partitionList})
-                WHERE refund = 0
-                    AND payment_by = 'Sender Pay'
-                    AND payment_type = 'Postpaid'
-                    AND service_type = 'express'
-                ORDER BY id
-            ";
-
-            // -----------------------------
-            // File setup
+            // FILE SETUP
             // -----------------------------
             $folder = $current->format('Y-m');
             $directory = storage_path("app/private/exports/{$folder}");
@@ -117,11 +103,12 @@ class ExportExpressFileJob implements ShouldQueue
             $filePath = storage_path("app/{$relativePath}");
 
             $handle = fopen($filePath, 'w');
+
             if (!$handle) {
-                throw new \Exception("Cannot create file");
+                throw new \Exception("Cannot create CSV file");
             }
 
-            // CSV header
+            // CSV HEADER
             fputcsv($handle, [
                 'Outbound Date','Accounting Date','Sender/Internal Reference','Sender/Display Name',
                 'Waybill No','From Analytic Account','To Analytic Account','Receiver Name',
@@ -129,17 +116,45 @@ class ExportExpressFileJob implements ShouldQueue
                 'Delivered Date','Confirm Date','From City','To City','Service Type','Waybill Status'
             ]);
 
-            $count = 0;
+            // -----------------------------
+            // STEP 3: STREAM EXPORT (FAST)
+            // -----------------------------
+            $query = "
+                SELECT 
+                    id,
+                    outbound_date,
+                    accounting_date,
+                    customer_reference_no,
+                    customer,
+                    waybill_no,
+                    from_analytic_account,
+                    to_analytic_account,
+                    receiver_name,
+                    weight,
+                    cod_total_amount,
+                    express_income_amount,
+                    cod_express_income_amount,
+                    cod_income_amount,
+                    cod_payable_amount,
+                    delivered_date,
+                    confirm_date,
+                    from_city,
+                    to_city,
+                    service_type,
+                    waybill_status
+                FROM upload_data PARTITION ({$partitionList})
+                WHERE refund = 0
+                    AND payment_by = 'Sender Pay'
+                    AND payment_type = 'Postpaid'
+                    AND service_type = 'express'
+            ";
 
-            // -----------------------------
-            // BUFFER STREAM (RAM SAFE)
-            // -----------------------------
-            $buffer = [];
-            $bufferSize = 2000;
+            $count = 0;
+            $batchSize = 5000;
 
             foreach (DB::cursor($query) as $row) {
 
-                $buffer[] = [
+                fputcsv($handle, [
                     $row->outbound_date,
                     $row->accounting_date,
                     $row->customer_reference_no,
@@ -160,29 +175,19 @@ class ExportExpressFileJob implements ShouldQueue
                     $row->to_city,
                     $row->service_type,
                     $row->waybill_status
-                ];
+                ]);
 
                 $count++;
 
-                if (count($buffer) >= $bufferSize) {
-                    foreach ($buffer as $line) {
-                        fputcsv($handle, $line);
-                    }
-                    $buffer = [];
-
+                if ($count % $batchSize === 0) {
                     fflush($handle);
                 }
-            }
-
-            // flush remaining
-            foreach ($buffer as $line) {
-                fputcsv($handle, $line);
             }
 
             fclose($handle);
 
             // -----------------------------
-            // ONE-TIME BULK UPDATE (FAST)
+            // STEP 4: BULK UPDATE export_id (OVERWRITE MODE)
             // -----------------------------
             DB::statement("
                 UPDATE upload_data PARTITION ({$partitionList})
@@ -191,31 +196,28 @@ class ExportExpressFileJob implements ShouldQueue
                     AND payment_by = 'Sender Pay'
                     AND payment_type = 'Postpaid'
                     AND service_type = 'express'
-                    AND export_id = $exportId
             ", [$exportId]);
-            Log::info("Export ID | {$exportId}");
 
             // -----------------------------
-            // Finalize
+            // STEP 5: FINALIZE EXPORT
             // -----------------------------
-            $endTime = microtime(true);
-            $duration = round($endTime - $startTime, 2);
+            DB::table('exports')
+                ->where('id', $exportId)
+                ->update([
+                    'filepath' => $relativePath,
+                    'total_rows' => $count,
+                    'end_datetime' => now(),
+                    'duration' => round(microtime(true) - $startTime, 2) . 's',
+                    'updated_at' => now(),
+                ]);
 
-            DB::table('exports')->where('id', $exportId)->update([
-                'filepath' => $relativePath,
-                'total_rows' => $count,
-                'end_datetime' => now(),
-                'duration' => $duration . 's',
-                'updated_at' => now(),
-            ]);
-
-            Log::info("Export completed | Rows: {$count} | Time: {$duration}s");
+            Log::info("Export completed | Rows: {$count} | ExportID: {$exportId}");
 
         } catch (\Throwable $e) {
 
             DB::table('exports')->where('id', $exportId)->update([
                 'end_datetime' => now(),
-                'duration' => (microtime(true) - $startTime) . 's',
+                'duration' => round(microtime(true) - $startTime, 2) . 's',
                 'error_message' => $e->getMessage(),
                 'updated_at' => now(),
             ]);

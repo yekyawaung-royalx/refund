@@ -143,15 +143,15 @@ export default function ViewUploadedFile() {
           <CardHeader className="flex flex-col md:flex-row md:items-center gap-4">
             <div className="basis-2/5">
               <CardTitle>
-                View File: <span className="text-green-500 font-light">{file.title}</span> , Found Records: <span className="text-green-500 font-light">{results.total.toLocaleString()}</span>
+                View File: <span className="text-green-500 font-light">{file.title}</span>
                 <div className="flex items-center space-x-4 mt-2">
+                  <div>
+                    <span className="text-sm font-medium">Found Records:</span>{" "}
+                    <span className="inline-block border border-amber-500 text-amber-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{results.total.toLocaleString()}</span>
+                  </div>
                   <div>
                     <span className="text-sm font-medium">Results In:</span>{" "}
                     <span className="inline-block border border-green-600 text-green-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{(execution_time_ms / 1000).toFixed(2)} s</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium">Scan Partitions:</span>{" "}
-                    <span className="inline-block border border-amber-500 text-amber-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{used_partitions}</span>
                   </div>
                 </div>
               </CardTitle>
@@ -240,7 +240,7 @@ export default function ViewUploadedFile() {
                                   : "border border-amber-600 text-amber-600 bg-transparent rounded-2xl"
                               )}
                             >
-                              {item.refund === 1 ? "Refund" : "No Refund"}
+                              {item.refund === 1 ? "Refunded" : "No Refund"}
                             </span>
                           ) : col === "waybill_no" ? (
                             <span

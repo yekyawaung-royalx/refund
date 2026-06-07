@@ -392,8 +392,7 @@ React.useEffect(() => {
                   />
                 </div>
 
-                {uploading && <Progress value={progress} />}
-
+                
                 <Button
                   type="submit"
                   disabled={uploading || allCategories.length === 0}
@@ -448,6 +447,33 @@ React.useEffect(() => {
               </div>
             </CardContent>
           </Card>
+
+          {uploading && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    
+    <div className="flex flex-col items-center gap-4">
+      
+      {/* GIF / WEBM animation */}
+      <video
+        src="/sticker.webm"
+        autoPlay
+        loop
+        muted
+        className="w-52 h-52"
+      />
+
+      {/* Progress */}
+      <div className="w-64">
+        <Progress value={progress} />
+      </div>
+
+      <p className="text-white text-sm">
+        Uploading... {Math.round(progress)}%
+      </p>
+
+    </div>
+  </div>
+)}
 
         </div>
       </div>

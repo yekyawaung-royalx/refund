@@ -101,7 +101,7 @@ class CheckRefundFileJob implements ShouldQueue
             'status' => 'validated'
         ]);
 
-        ImportRefundFileJob::dispatch(
+        ImportRefundedToStagingJob::dispatch(
             $this->uploadId,
             $this->filePath,
             $this->username

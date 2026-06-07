@@ -10,14 +10,12 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Mail;
 
 class ExportSameDayFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected string $yearMonth;
-    protected int $batchSize = 5000; // batch size for updating export_id
 
     public function __construct(?string $yearMonth = null)
     {
@@ -26,23 +24,60 @@ class ExportSameDayFileJob implements ShouldQueue
 
     public function handle()
     {
-        // -----------------------------
-        // Start timer for performance measurement
-        // -----------------------------
         $startTime = microtime(true);
         $startDt = Carbon::now();
+        $exportStartedAt = Carbon::now();
 
-        $timestamp = now()->timestamp;
-        $today = Carbon::now()->format('Ymd-His');
-        $fileName = "export-{$today}.csv";
+        $fileName = "export-same-day-" . now()->format('Ymd-His') . ".csv";
 
         // -----------------------------
-        // Create export record
+        // Partition selection
+        // -----------------------------
+        $current = Carbon::createFromFormat('Ym', $this->yearMonth);
+
+        $partitions = collect(range(0, 2))
+            ->map(fn ($i) => "P" . $current->copy()->subMonths($i)->format('Ym'))
+            ->toArray();
+
+        $existingPartitions = DB::table('information_schema.PARTITIONS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', 'upload_data')
+            ->whereIn('PARTITION_NAME', $partitions)
+            ->pluck('PARTITION_NAME')
+            ->toArray();
+
+        if (empty($existingPartitions)) {
+            throw new \Exception("Required partitions not found");
+        }
+
+        $partitionList = implode(',', $existingPartitions);
+
+        // -----------------------------
+        // STEP 1: COUNT FIRST (UX SAFE)
+        // -----------------------------
+        $countQuery = "
+            SELECT COUNT(*) as total
+            FROM upload_data PARTITION ({$partitionList})
+            WHERE refund = 0
+                AND payment_by = 'Sender Pay'
+                AND payment_type = 'Postpaid'
+                AND service_type = 'same_day_delivery'
+        ";
+
+        $totalRows = DB::selectOne($countQuery)->total;
+
+        if ($totalRows == 0) {
+            Log::info("Export skipped (no data found)");
+            return;
+        }
+
+        // -----------------------------
+        // STEP 2: CREATE EXPORT RECORD ONLY IF DATA EXISTS
         // -----------------------------
         $exportId = DB::table('exports')->insertGetId([
             'filename' => $fileName,
             'filepath' => '',
-            'service_type' => 'same-day-delivery',
+            'service_type' => 'express',
             'total_rows' => 0,
             'start_datetime' => $startDt,
             'end_datetime' => $startDt,
@@ -55,35 +90,40 @@ class ExportSameDayFileJob implements ShouldQueue
         try {
 
             // -----------------------------
-            // Determine partitions
+            // FILE SETUP
             // -----------------------------
-            $current = Carbon::createFromFormat('Ym', $this->yearMonth);
+            $folder = $current->format('Y-m');
+            $directory = storage_path("app/private/exports/{$folder}");
 
-            $partitions = collect(range(0, 2))
-                ->map(fn($i) => "P" . $current->copy()->subMonths($i)->format('Ym'))
-                ->toArray();
-
-            $existingPartitions = DB::table('information_schema.PARTITIONS')
-                ->where('TABLE_SCHEMA', DB::getDatabaseName())
-                ->where('TABLE_NAME', 'upload_data')
-                ->whereIn('PARTITION_NAME', $partitions)
-                ->pluck('PARTITION_NAME')
-                ->toArray();
-
-            if (empty($existingPartitions)) {
-                throw new \Exception("Required partitions not found");
+            if (!is_dir($directory)) {
+                mkdir($directory, 0775, true);
             }
 
-            $partitionList = implode(',', $existingPartitions);
+            $relativePath = "private/exports/{$folder}/{$fileName}";
+            $filePath = storage_path("app/{$relativePath}");
+
+            $handle = fopen($filePath, 'w');
+
+            if (!$handle) {
+                throw new \Exception("Cannot create CSV file");
+            }
+
+            // CSV HEADER
+            fputcsv($handle, [
+                'Outbound Date','Accounting Date','Sender/Internal Reference','Sender/Display Name',
+                'Waybill No','From Analytic Account','To Analytic Account','Receiver Name',
+                'Weight','Total','Insurance Amount','COD Express Income','COD Income','COD Payable',
+                'Delivered Date','Confirm Date','From City','To City','Service Type','Waybill Status'
+            ]);
+
             // -----------------------------
-            // Build export query
+            // STEP 3: STREAM EXPORT (FAST)
             // -----------------------------
             $query = "
                 SELECT 
                     id,
                     outbound_date,
                     accounting_date,
-                    delivered_date,
                     customer_reference_no,
                     customer,
                     waybill_no,
@@ -96,6 +136,7 @@ class ExportSameDayFileJob implements ShouldQueue
                     cod_express_income_amount,
                     cod_income_amount,
                     cod_payable_amount,
+                    delivered_date,
                     confirm_date,
                     from_city,
                     to_city,
@@ -106,43 +147,11 @@ class ExportSameDayFileJob implements ShouldQueue
                     AND payment_by = 'Sender Pay'
                     AND payment_type = 'Postpaid'
                     AND service_type = 'same_day_delivery'
-                ORDER BY id
             ";
 
-            // -----------------------------
-            // Prepare export file path
-            // -----------------------------
-            $folder = $current->format('Y-m');
-            $directory = storage_path("app/private/exports/{$folder}");
-
-            if (!is_dir($directory)) {
-                if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
-                    throw new \Exception("Failed to create directory: {$directory}");
-                }
-            }
-
-            $relativePath = "private/exports/{$folder}/{$fileName}";
-            $filePath = storage_path("app/{$relativePath}");
-
-            $handle = fopen($filePath, 'w');
-            if (!$handle) throw new \Exception("Unable to create export file");
-
-            // -----------------------------
-            // Write CSV header
-            // -----------------------------
-            fputcsv($handle, [
-                'Outbound Date','Accounting Date','Sender/Internal Reference','Sender/Display Name',
-                'Waybill No','From Analytic Account','To Analytic Account','Receiver Name',
-                'Weight','Total','Insurance Amount','COD Express Income','COD Income','COD Payable',
-                'Delivered Date','Confirm Date','From City','To City','Service Type','Waybill Status'
-            ]);
-
             $count = 0;
-            $rowIds = [];
+            $batchSize = 5000;
 
-            // -----------------------------
-            // Cursor-based export (memory-efficient)
-            // -----------------------------
             foreach (DB::cursor($query) as $row) {
 
                 fputcsv($handle, [
@@ -168,88 +177,53 @@ class ExportSameDayFileJob implements ShouldQueue
                     $row->waybill_status
                 ]);
 
-                $rowIds[] = $row->id;
                 $count++;
 
-                // -----------------------------
-                // Batch update export_id in transaction
-                // -----------------------------
-                if ($count % $this->batchSize === 0) {
-                    DB::transaction(function() use ($rowIds, $exportId) {
-                        DB::table('upload_data')->whereIn('id', $rowIds)->update(['export_id' => $exportId]);
-                    });
-                    $rowIds = [];
+                if ($count % $batchSize === 0) {
                     fflush($handle);
                 }
-            }
-
-            // -----------------------------
-            // Update remaining rows
-            // -----------------------------
-            if (!empty($rowIds)) {
-                DB::transaction(function() use ($rowIds, $exportId) {
-                    DB::table('upload_data')->whereIn('id', $rowIds)->update(['export_id' => $exportId]);
-                });
             }
 
             fclose($handle);
 
             // -----------------------------
-            // Finalize export record
+            // STEP 4: BULK UPDATE export_id (OVERWRITE MODE)
             // -----------------------------
-            $endTime = microtime(true);
-            $duration = round($endTime - $startTime, 2);
-            $endDt = Carbon::now();
+            DB::statement("
+                UPDATE upload_data PARTITION ({$partitionList})
+                SET export_id = ?
+                WHERE refund = 0
+                    AND payment_by = 'Sender Pay'
+                    AND payment_type = 'Postpaid'
+                    AND service_type = 'same_day_delivery'
+            ", [$exportId]);
 
-            DB::table('exports')->where('id', $exportId)->update([
-                'filepath' => $relativePath,
-                'total_rows' => $count,
-                'end_datetime' => $endDt,
-                'duration' => $duration . 's',
-                'updated_at' => now(),
-            ]);
+            // -----------------------------
+            // STEP 5: FINALIZE EXPORT
+            // -----------------------------
+            DB::table('exports')
+                ->where('id', $exportId)
+                ->update([
+                    'filepath' => $relativePath,
+                    'total_rows' => $count,
+                    'end_datetime' => now(),
+                    'duration' => round(microtime(true) - $startTime, 2) . 's',
+                    'updated_at' => now(),
+                ]);
 
-            Log::info("Export completed: {$filePath} | Rows: {$count} | Duration: {$duration}s");
-            
-            //DailyRefundSummaryJob::dispatch($exportId, $count, null, null);
-            // -----------------------------
-            // Notify user
-            // -----------------------------
-            Mail::to('yekyawaung1991@gmail.com')
-                ->queue(new \App\Mail\ExportCompletedMail(
-                    $this->yearMonth,
-                    $count,
-                    $duration,
-                    $fileName,
-                    $startDt->toDateTimeString(),
-                    $endDt->toDateTimeString()
-                ));
+            Log::info("Export completed | Rows: {$count} | ExportID: {$exportId}");
 
         } catch (\Throwable $e) {
-            // -----------------------------
-            // Error handling
-            // -----------------------------
-            $endTime = microtime(true);
-            $duration = round($endTime - $startTime, 2);
-            $endDt = Carbon::now();
 
             DB::table('exports')->where('id', $exportId)->update([
-                'end_datetime' => $endDt,
-                'duration' => $duration . 's',
+                'end_datetime' => now(),
+                'duration' => round(microtime(true) - $startTime, 2) . 's',
                 'error_message' => $e->getMessage(),
                 'updated_at' => now(),
             ]);
 
-            // update refund summary table
-            // DB::table('refund_summaries')->insert([
-            //     'payment_date' => '',
-            //     'to_refund_amount' => '',
-            //     'to_refund_rows' => $count,
-            //     'created_at' => now(),
-            //     'updated_at' => now(),
-            // ]);
-
             Log::error("Export failed: " . $e->getMessage());
+
             throw $e;
         }
     }

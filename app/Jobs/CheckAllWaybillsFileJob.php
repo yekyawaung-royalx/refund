@@ -230,7 +230,7 @@ class CheckAllWaybillsFileJob implements ShouldQueue
                 'status' => 'validated',
             ]);
 
-            ImportAllWaybillsFileJob::dispatch(
+            ImportAllWaybillsToStagingJob::dispatch(
                 $this->uploadId, 
                 $this->filePath,
                 $this->username,
@@ -239,7 +239,7 @@ class CheckAllWaybillsFileJob implements ShouldQueue
 
         } catch (\Throwable $e) {
 
-            Log::error('CheckAllWaybillsFileJob failed', [
+            Log::error('ImportAllWaybillsToStagingJob failed', [
                 'upload_id' => $this->uploadId,
                 'error' => $e->getMessage(),
             ]);
@@ -301,10 +301,38 @@ class CheckAllWaybillsFileJob implements ShouldQueue
         }
 
         if (($checks['cod_required'] ?? false)) {
-            if ((float)($row[25] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Total Amount must be >= 0"; // 0,+
-            if ((float)($row[26] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Express Income must be >= 0"; // > 0,+
-            if ((float)($row[27] ?? 0) < 0) $errors[] = "Row {$rowNumber}: COD Income must be >= 0"; // 0,+
-            if ((float)($row[28] ?? 0)  === '') $errors[] = "Row {$rowNumber}: COD Payable must not be empty"; // 0,+,-
+
+            $codTotal   = (float) trim($row[25] ?? 0);
+            $codExpress = (float) trim($row[26] ?? 0);
+            $codIncome  = (float) trim($row[27] ?? 0);
+            $codPayable = (float) trim($row[28] ?? 0);
+
+            if ($codTotal < 0) {
+                $errors[] = "Row {$rowNumber}: COD Total Amount must be >= 0";
+            }
+
+            if ($codExpress < 0) {
+                $errors[] = "Row {$rowNumber}: COD Express Income must be >= 0";
+            }
+
+            if ($codIncome < 0) {
+                $errors[] = "Row {$rowNumber}: COD Income must be >= 0";
+            }
+
+            if ($codPayable === null || $codPayable === '') {
+                $errors[] = "Row {$rowNumber}: COD Payable must not be empty";
+            }
+
+            /**
+             * ALL ZERO CHECK (clean version)
+             */
+            if ($codTotal == 0 &&
+                $codExpress == 0 &&
+                $codIncome == 0 &&
+                ((float)$codPayable) == 0
+            ) {
+                $errors[] = "Row {$rowNumber}: COD values cannot all be zero";
+            }
         }
 
         return $errors;

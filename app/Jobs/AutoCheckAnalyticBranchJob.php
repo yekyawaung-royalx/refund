@@ -19,8 +19,6 @@ class AutoCheckAnalyticBranchJob implements ShouldQueue
     public $timeout = 1800;
     public $tries = 3;
 
-    protected int $chunkSize = 1000; // adjust based on VPS memory
-
     public function __construct(int $uploadId)
     {
         $this->uploadId = $uploadId;
@@ -29,46 +27,55 @@ class AutoCheckAnalyticBranchJob implements ShouldQueue
     public function handle()
     {
         try {
+            $startTime = microtime(true);
+            // -----------------------------
+            // 1. Update from_analytic_account
+            // -----------------------------
+            $fromUpdated = DB::affectingStatement("
+                UPDATE upload_data u
+                JOIN analytics a ON u.origin_branch = a.reference
+                SET u.from_analytic_account = a.account
+                WHERE u.norefund_id = ?
+                  AND u.from_analytic_account IS NULL
+                  AND u.origin_branch IS NOT NULL
+            ", [$this->uploadId]);
+
 
             // -----------------------------
-            // Update from_analytic_account in chunks
+            // 2. Update to_analytic_account
             // -----------------------------
-            DB::table('upload_data as u')
-                ->join('analytics as a', 'u.origin_branch', '=', 'a.reference')
-                ->where('u.norefund_id', $this->uploadId)
-                ->whereNull('u.from_analytic_account')
-                ->select('u.id', 'a.account')
-                ->orderBy('u.id')
-                ->chunk($this->chunkSize, function ($rows) {
-                    foreach ($rows as $row) {
-                        DB::table('upload_data')
-                            ->where('id', $row->id)
-                            ->update(['from_analytic_account' => $row->account]);
-                    }
-                });
+            $toUpdated = DB::affectingStatement("
+                UPDATE upload_data u
+                JOIN analytics a ON u.destination_branch = a.reference
+                SET u.to_analytic_account = a.account
+                WHERE u.norefund_id = ?
+                  AND u.to_analytic_account IS NULL
+                  AND u.destination_branch IS NOT NULL
+            ", [$this->uploadId]);
+
+            $endTime = microtime(true);
+            $duration = round($endTime - $startTime, 2);
 
             // -----------------------------
-            // Update to_analytic_account in chunks
+            // 3. Logging (single line, clean)
             // -----------------------------
-            DB::table('upload_data as u')
-                ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
-                ->where('u.norefund_id', $this->uploadId)
-                ->whereNull('u.to_analytic_account')
-                ->select('u.id', 'a.account')
-                ->orderBy('u.id')
-                ->chunk($this->chunkSize, function ($rows) {
-                    foreach ($rows as $row) {
-                        DB::table('upload_data')
-                            ->where('id', $row->id)
-                            ->update(['to_analytic_account' => $row->account]);
-                    }
-                });
+            Log::info(
+                "Analytic update completed | upload_id: {$this->uploadId} | " .
+                "from_updated: {$fromUpdated} | to_updated: {$toUpdated} | durations: {$duration} "
+            );
 
-            Log::info("AutoCheckAnalyticBranchJob completed successfully for norefund_id: {$this->uploadId}");
 
         } catch (\Throwable $e) {
-            Log::error("AutoCheckAnalyticBranchJob failed for norefund_id {$this->uploadId}: " . $e->getMessage());
+
+            Log::error(
+                "AutoCheckAnalyticBranchJob failed | upload_id={$this->uploadId} | error=" .
+                $e->getMessage()
+            );
+
             throw $e;
         }
+
+        // Optional next job
+        // FollowUpCheckAnalyticBranchJob::dispatch();
     }
 }

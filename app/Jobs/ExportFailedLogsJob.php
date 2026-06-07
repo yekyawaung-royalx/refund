@@ -11,22 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class ExportFailedLogsJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    public function __construct(
-        public int $uploadId
-    ) {}
+    public function __construct(public int $uploadId) {}
 
     public function handle()
     {
-        $logs = DB::table('failed_logs')
-            ->where('upload_id', $this->uploadId)
-            ->get();
-
-        if ($logs->isEmpty()) {
-            return;
-        }
-
         $folder = now()->format('Y-m');
         $dir = storage_path("app/private/upload-failed/{$folder}");
 
@@ -35,40 +23,32 @@ class ExportFailedLogsJob implements ShouldQueue
         }
 
         $relativePath = "upload-failed/{$folder}/failed_{$this->uploadId}.csv";
+        $filePath = storage_path("app/private/" . $relativePath);
 
-        $file = storage_path("app/private/" . $relativePath);
+        $handle = fopen($filePath, 'w');
 
-        $handle = fopen($file, 'w');
+        fputcsv($handle, ['waybill_no', 'reason']);
 
-        fputcsv($handle, [
-            'upload_id',
-            'waybill_no',
-            'reason',
-            'row_data'
-        ]);
+        DB::table('staging_data')
+            ->where('upload_id', $this->uploadId)
+            ->where('status', 'failed')
+            ->orderBy('id')
+            ->chunkById(2000, function ($rows) use ($handle) {
 
-        foreach ($logs as $log) {
-
-            fputcsv($handle, [
-                $log->upload_id,
-                $log->waybill_no,
-                $log->reason,
-                $log->row_data,
-            ]);
-        }
+                foreach ($rows as $row) {
+                    fputcsv($handle, [
+                        $row->waybill_no,
+                        $row->reason
+                    ]);
+                }
+            });
 
         fclose($handle);
 
-        // save file path
         DB::table('uploads')
             ->where('id', $this->uploadId)
             ->update([
-                'failed_path' => $relativePath,
+                'failed_path' => $relativePath
             ]);
-
-        // clear logs
-        DB::table('failed_logs')
-            ->where('upload_id', $this->uploadId)
-            ->delete();
     }
 }

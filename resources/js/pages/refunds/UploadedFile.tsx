@@ -248,7 +248,7 @@ export default function UploadedFile() {
                         </TableCell>
                         <TableCell className={columnWidths.job_stats}>
                           <span className="text-muted-foreground">Attempts:</span> {item.attempts} <br />
-                          <span className="text-muted-foreground">Duration:</span> {item.processed_duration? item.processed_duration:0}s
+                          <span className="text-muted-foreground">Duration:</span> {item.processed_duration? Number(item.processed_duration).toFixed(2):0} s
                           </TableCell>
                       <TableCell className={columnWidths.status}>{getStatusBadge(item.status)}</TableCell>
                     <TableCell className={cn("flex gap-2", columnWidths.actions)}>

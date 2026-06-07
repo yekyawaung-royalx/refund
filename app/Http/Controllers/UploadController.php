@@ -126,15 +126,6 @@ class UploadController extends Controller
 
         $file = Upload::findOrFail($upload);
 
-        // folder = 2026-03
-        [$year, $month] = explode('-', $file->folder);
-
-        $currentPartition = 'P' . $year . $month;
-
-        // previous month
-        $prevDate = \Carbon\Carbon::createFromDate($year, $month, 1)->subMonth();
-        $prevPartition = 'P' . $prevDate->format('Ym');
-
         $search = $request->query('search');
 
         /**
@@ -146,9 +137,7 @@ class UploadController extends Controller
         /**
          * query
          */
-        $query = DB::table(
-            DB::raw("upload_data PARTITION($prevPartition,$currentPartition)")
-        )->where($column, $upload);
+        $query = DB::table('upload_data')->where($column, $upload);
 
         /**
          * search filter
@@ -170,7 +159,6 @@ class UploadController extends Controller
 
         return Inertia::render('refunds/ViewUploadedFile', [
             'execution_time_ms' => $executionTimeMs,
-            'used_partitions'   => $prevPartition . ',' . $currentPartition,
             'results'           => $results,
             'uploadId'          => $upload,
             'file'              => $file,
