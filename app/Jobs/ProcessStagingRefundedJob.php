@@ -52,7 +52,7 @@ class ProcessStagingRefundedJob implements ShouldQueue
          */
         $uploadMap = DB::table('upload_data')
             ->whereIn('waybill_no', $waybills)
-            ->get(['waybill_no', 'refund'])
+            ->get(['waybill_no', 'refund','payment_date','vendor_type'])
             ->keyBy('waybill_no');
 
         $successIds = [];
@@ -86,21 +86,71 @@ class ProcessStagingRefundedJob implements ShouldQueue
          */
         if (!empty($successWaybills)) {
 
-            DB::table('upload_data')
-                ->whereIn('waybill_no', $successWaybills)
-                ->where('refund', 0)
-                ->update([
-                    'refund' => 1,
-                    'refund_id' => $this->uploadId,
-                    'updated_at' => now(),
-                ]);
+    $updateRows = [];
 
-            DB::table('staging_refunded')
-                ->whereIn('id', $successIds)
-                ->update([
-                    'status' => 'processed'
-                ]);
+    foreach ($rows as $row) {
+
+        if (!in_array($row->id, $successIds)) {
+            continue;
         }
+
+        $data = json_decode($row->row_data, true);
+
+        $paymentDate = null;
+
+        if (!empty($data[2])) {
+            $paymentDate = \Carbon\Carbon::createFromFormat(
+                'm/d/Y',
+                $data[2]
+            )->format('Y-m-d');
+        }
+
+        $updateRows[$row->waybill_no] = [
+            'payment_date' => $paymentDate,
+            'vendor_type'  => $data[6] ?? null,
+        ];
+    }
+
+    $paymentDateCases = [];
+    $vendorTypeCases = [];
+
+    foreach ($updateRows as $waybill => $values) {
+
+        $waybillEscaped = addslashes($waybill);
+
+        $paymentDate = $values['payment_date'];
+        $vendorType  = addslashes($values['vendor_type'] ?? '');
+
+        $paymentDateCases[] =
+            "WHEN '{$waybillEscaped}' THEN " .
+            ($paymentDate ? "'{$paymentDate}'" : "NULL");
+
+        $vendorTypeCases[] =
+            "WHEN '{$waybillEscaped}' THEN '{$vendorType}'";
+    }
+
+    DB::statement("
+        UPDATE upload_data
+        SET
+            refund = 1,
+            refund_id = {$this->uploadId},
+            payment_date = CASE waybill_no
+                " . implode(' ', $paymentDateCases) . "
+            END,
+            vendor_type = CASE waybill_no
+                " . implode(' ', $vendorTypeCases) . "
+            END,
+            updated_at = NOW()
+        WHERE refund = 0
+        AND waybill_no IN ('" . implode("','", array_keys($updateRows)) . "')
+    ");
+
+    DB::table('staging_refunded')
+        ->whereIn('id', $successIds)
+        ->update([
+            'status' => 'processed'
+        ]);
+}
 
         /**
          * STEP 5: FAILED UPDATE (BATCH SAFE)
