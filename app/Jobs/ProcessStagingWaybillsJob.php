@@ -37,6 +37,10 @@ class ProcessStagingWaybillsJob implements ShouldQueue
         $fileOpened = false;
         $relativePath = null;
 
+        $analyticsMap = DB::table('analytics')
+            ->pluck('account', 'reference')
+            ->toArray();
+
         // =========================================
         // IMPORTANT: DO NOT LOAD MILLION RECORDS
         // =========================================
@@ -48,6 +52,7 @@ class ProcessStagingWaybillsJob implements ShouldQueue
             ->orderBy('id')
             ->chunkById($this->batchSize, function ($rows) use (
                 $now,
+                $analyticsMap,
                 &$processed,
                 &$failed,
                 &$file,
@@ -78,6 +83,16 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
                     $data = json_decode($row->row_data, true);
                     $waybill = $row->waybill_no;
+
+                    // analytic account lookup
+                    $originBranch = trim($data[11] ?? '');
+                    $destinationBranch = trim($data[13] ?? '');
+
+                    $fromAnalytic =
+                        $analyticsMap[$originBranch] ?? null;
+
+                    $toAnalytic =
+                        $analyticsMap[$destinationBranch] ?? null;
 
                     // =========================
                     // FAST DUPLICATE CHECK (INDEX REQUIRED)
@@ -118,6 +133,8 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                             'origin_branch' => $data[11] ?? null,
                             'to_city' => $data[12] ?? null,
                             'destination_branch' => $data[13] ?? null,
+                            'from_analytic_account' => $fromAnalytic,
+                            'to_analytic_account' => $toAnalytic,
                             'receiver_name' => $this->clean($data[15] ?? null, 255),
                             'payment_by' => $data[20] ?? null,
                             'payment_type' => $data[21] ?? null,
@@ -249,7 +266,6 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 'updated_at' => $now,
             ]);
 
-        AutoCheckAnalyticBranchJob::dispatch($this->uploadId);
     }
 
     // =========================

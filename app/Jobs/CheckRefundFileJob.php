@@ -30,7 +30,10 @@ class CheckRefundFileJob implements ShouldQueue
         $upload = Upload::find($this->uploadId);
         if (!$upload) return;
 
-        $upload->update(['status' => 'checking']);
+        $upload->update([
+            'status' => 'checking',
+            'attempts' => $this->attempts(),
+        ]);
 
         $file = new \SplFileObject($this->filePath);
         $file->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY);
