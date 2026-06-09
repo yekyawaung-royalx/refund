@@ -77,7 +77,7 @@ class ExportSameDayFileJob implements ShouldQueue
         $exportId = DB::table('exports')->insertGetId([
             'filename' => $fileName,
             'filepath' => '',
-            'service_type' => 'express',
+            'service_type' => 'same-day-delivery',
             'total_rows' => 0,
             'start_datetime' => $startDt,
             'end_datetime' => $startDt,
