@@ -37,10 +37,6 @@ class ProcessStagingWaybillsJob implements ShouldQueue
         $fileOpened = false;
         $relativePath = null;
 
-        $analyticsMap = DB::table('analytics')
-            ->pluck('account', 'reference')
-            ->toArray();
-
         // =========================================
         // IMPORTANT: DO NOT LOAD MILLION RECORDS
         // =========================================
@@ -52,7 +48,6 @@ class ProcessStagingWaybillsJob implements ShouldQueue
             ->orderBy('id')
             ->chunkById($this->batchSize, function ($rows) use (
                 $now,
-                $analyticsMap,
                 &$processed,
                 &$failed,
                 &$file,
@@ -81,18 +76,7 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
                 foreach ($rows as $row) {
 
-                    $data = json_decode($row->row_data, true);
                     $waybill = $row->waybill_no;
-
-                    // analytic account lookup
-                    $originBranch = trim($data[11] ?? '');
-                    $destinationBranch = trim($data[13] ?? '');
-
-                    $fromAnalytic =
-                        $analyticsMap[$originBranch] ?? null;
-
-                    $toAnalytic =
-                        $analyticsMap[$destinationBranch] ?? null;
 
                     // =========================
                     // FAST DUPLICATE CHECK (INDEX REQUIRED)
@@ -115,8 +99,8 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
                     try {
 
-                        $outboundDate = $this->safeDate($data[1] ?? null);
-                        $deliveredDate = $this->safeDate($data[31] ?? null);
+                        $outboundDate = $this->safeDate($row->outbound_date ?? null);
+                        $deliveredDate = $this->safeDate($row->delivered_date ?? null);
 
                         $accountingDate = $this->getAccountingDate($outboundDate, $deliveredDate);
 
@@ -125,31 +109,31 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                         // =========================
                         $successInsert[] = [
                             'norefund_id' => $this->uploadId,
-                            'waybill_no' => $waybill,
+                            'waybill_no' => $row->waybill_no,
                             'outbound_date' => $outboundDate,
-                            'customer_reference_no' => $data[3] ?? null,
-                            'customer' => $data[4] ?? null,
-                            'from_city' => $data[10] ?? null,
-                            'origin_branch' => $data[11] ?? null,
-                            'to_city' => $data[12] ?? null,
-                            'destination_branch' => $data[13] ?? null,
-                            'from_analytic_account' => $fromAnalytic,
-                            'to_analytic_account' => $toAnalytic,
-                            'receiver_name' => $this->clean($data[15] ?? null, 255),
-                            'payment_by' => $data[20] ?? null,
-                            'payment_type' => $data[21] ?? null,
-                            'service' => $data[22] ?? null,
-                            'weight' => isset($data[23]) ? (float)$data[23] : null,
-                            'express_income_amount' => isset($data[24]) ? (float)$data[24] : null,
-                            'cod_total_amount' => isset($data[25]) ? (float)$data[25] : null,
-                            'cod_express_income_amount' => isset($data[26]) ? (float)$data[26] : null,
-                            'cod_income_amount' => isset($data[27]) ? (float)$data[27] : null,
-                            'cod_payable_amount' => isset($data[28]) ? (float)$data[28] : null,
-                            'insurance_expense_amount' => '0.0',
+                            'customer_reference_no' => $row->customer_reference_no ?? null,
+                            'customer' => $row->customer ?? null,
+                            'from_city' => $row->from_city ?? null,
+                            'origin_branch' => $row->origin_branch ?? null,
+                            'to_city' => $row->to_city ?? null,
+                            'destination_branch' => $row->destination_branch ?? null,
+                            'from_analytic_account' => $row->from_analytic_account,
+                            'to_analytic_account' => $row->to_analytic_account,
+                            'receiver_name' => $row->receiver_name,
+                            'payment_by' => $row->payment_by,
+                            'payment_type' => $row->payment_type,
+                            'service' => $row->service,
+                            'weight' => $row->weight,
+                            'express_income_amount' => $row->express_income_amount,
+                            'cod_total_amount' => $row->cod_total_amount,
+                            'cod_express_income_amount' => $row->cod_express_income_amount,
+                            'cod_income_amount' => $row->cod_income_amount,
+                            'cod_payable_amount' => $row->cod_payable_amount,
+                            'insurance_expense_amount' => $row->insurance_expense_amount,
                             'refund' => 0,
-                            'service_type' => $data[29] ?? null,
-                            'waybill_status' => $this->safeStatus($data[30] ?? null),
-                            'confirm_date' => $data[32] ? date('Y-m-d', strtotime($data[32])) : null,
+                            'service_type' => $row->service_type,
+                            'waybill_status' => $row->waybill_status,
+                            'confirm_date' => $row->confirm_date,
                             'delivered_date' => $deliveredDate,
                             'accounting_date' => $accountingDate,
                             'created_at' => $now,
@@ -160,17 +144,17 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                         // upload_details table (NEW FEATURE)
                         // =========================
                         $uploadDetailsInsert[] = [
-                            'waybill_no' => $waybill, // fill after insert
-                            'customer_order_reference' => $data[2] ?? null,
-                            'phone' => $data[5] ?? null,
-                            'mobile' => $data[6] ?? null,
-                            'operator' => $data[7] ?? null,
-                            'pickup_man' => $data[8] ?? null,
-                            'other' => $data[14] ?? null,
-                            'receiver_mobile' => $this->clean($data[16] ?? null, 255),
-                            'receiver_address' => $this->clean($data[17] ?? null, 255),
-                            'recipient_name' => $this->clean($data[18] ?? null, 255),
-                            'recipient_phone' => $this->clean($data[19] ?? null, 255),
+                            'waybill_no' => $row->waybill_no, // fill after insert
+                            'customer_order_reference' => $row->customer_order_reference,
+                            'phone' => $row->phone,
+                            'mobile' => $row->mobile,
+                            'operator' => $row->operator,
+                            'pickup_man' => $row->pickup_man,
+                            'other' => $row->other,
+                            'receiver_mobile' => $row->receiver_mobile,
+                            'receiver_address' => $row->receiver_address,
+                            'recipient_name' => $row->recipient_name,
+                            'recipient_phone' => $row->recipient_phone,
                             'created_at' => $now,
                             'updated_at' => $now,
                         ];
@@ -199,15 +183,8 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 DB::transaction(function () use ($successInsert, $successIds, $failedIds, $uploadDetailsInsert) {
                     if (!empty($successInsert)) {
 
-                        DB::table('upload_data')->upsert(
-                            $successInsert,
-                            ['waybill_no']
-                        );
-
-                        DB::table('upload_details')->upsert(
-                            $uploadDetailsInsert,
-                            ['waybill_no']
-                        );
+                        DB::table('upload_data')->insert($successInsert);
+                        DB::table('upload_details')->insert($uploadDetailsInsert);
                     }
 
                     if (!empty($successIds)) {
@@ -311,18 +288,5 @@ class ProcessStagingWaybillsJob implements ShouldQueue
             'sender-postpaid', 'receiver-postpaid', 'sender-foc' => $d,
             default => null,
         };
-    }
-
-    private function safeStatus($s): ?string
-    {
-        $s = strtoupper(trim((string)$s));
-        return in_array($s, ['DELIVERED','RETURNED','CANCELLED','COMPLETED','REJECTED']) ? $s : null;
-    }
-
-    private function clean($v, $len = null)
-    {
-        if ($v === null) return null;
-        $v = preg_replace('/[\x00-\x1F\x7F]/u', '', $v);
-        return $len ? mb_substr(trim($v), 0, $len) : trim($v);
     }
 }
