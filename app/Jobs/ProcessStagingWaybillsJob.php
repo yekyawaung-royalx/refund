@@ -17,7 +17,7 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
     protected int $uploadId;
     protected string $category;
-    protected int $batchSize = 1000;
+    protected int $batchSize = 2000;
 
     public function __construct(int $uploadId, string $category)
     {
@@ -30,160 +30,179 @@ class ProcessStagingWaybillsJob implements ShouldQueue
         $startTime = microtime(true);
         $now = now();
 
-        $processed = 0;
-        $failed = 0;
+        $totalProcessed = 0;
+        $totalFailed = 0;
 
         $file = null;
         $fileOpened = false;
         $relativePath = null;
 
-        // =========================================
-        // IMPORTANT: DO NOT LOAD MILLION RECORDS
-        // =========================================
-        // better approach: index-based lookup only
-        // (DO NOT pluck all upload_data)
         DB::table('staging_all_waybills')
             ->where('upload_id', $this->uploadId)
             ->where('status', 'pending')
             ->orderBy('id')
             ->chunkById($this->batchSize, function ($rows) use (
                 $now,
-                &$processed,
-                &$failed,
+                &$totalProcessed,
+                &$totalFailed,
                 &$file,
                 &$fileOpened,
                 &$relativePath
             ) {
+
                 $batchStart = microtime(true);
+
+                /**
+                 * STEP 1: normalize + group safely
+                 */
+                $rowsByDate = $rows->groupBy(function ($row) {
+                    return $this->getAccountingDate(
+                        $this->safeDate($row->outbound_date ?? null),
+                        $this->safeDate($row->delivered_date ?? null)
+                    );
+                });
+
                 $successInsert = [];
                 $uploadDetailsInsert = [];
                 $successIds = [];
-
-                $waybills = collect($rows)
-                    ->pluck('waybill_no')
-                    ->filter()
-                    ->unique()
-                    ->values()
-                    ->all();
-
-                $existingWaybills = DB::table('upload_data')
-                    ->whereIn('waybill_no', $waybills)
-                    ->pluck('waybill_no')
-                    ->flip()
-                    ->toArray();
-
                 $failedIds = [];
 
-                foreach ($rows as $row) {
+                $batchProcessed = 0;
+                $batchFailed = 0;
 
-                    $waybill = $row->waybill_no;
+                foreach ($rowsByDate as $accountingDate => $groupRows) {
 
-                    // =========================
-                    // FAST DUPLICATE CHECK (INDEX REQUIRED)
-                    // =========================
-                    if (isset($existingWaybills[$waybill])) {
+                    $waybills = $groupRows
+                        ->pluck('waybill_no')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
 
-                        $this->writeFailedFile(
-                            $file,
-                            $fileOpened,
-                            $relativePath,
-                            $waybill,
-                            'DUPLICATE'
-                        );
+                    /**
+                     * STEP 2: partition scoped duplicate check
+                     */
+                    $existingWaybills = DB::table('upload_data')
+                        ->where('accounting_date', $accountingDate)
+                        ->whereIn('waybill_no', $waybills)
+                        ->pluck('waybill_no')
+                        ->flip()
+                        ->toArray();
 
-                        $failedIds[] = $row->id;
+                    // Log::info('partition_scan', [
+                    //     'upload_id' => $this->uploadId,
+                    //     'accounting_date' => $accountingDate,
+                    //     'partition' => 'P' . date('Ym', strtotime($accountingDate)),
+                    //     'waybill_count' => count($waybills),
+                    // ]);
 
-                        $failed++;
-                        continue;
-                    }
+                    foreach ($groupRows as $row) {
 
-                    try {
+                        $waybill = $row->waybill_no;
 
-                        $outboundDate = $this->safeDate($row->outbound_date ?? null);
-                        $deliveredDate = $this->safeDate($row->delivered_date ?? null);
+                        if (isset($existingWaybills[$waybill])) {
 
-                        $accountingDate = $this->getAccountingDate($outboundDate, $deliveredDate);
+                            $this->writeFailedFile(
+                                $file,
+                                $fileOpened,
+                                $relativePath,
+                                $waybill,
+                                'DUPLICATE'
+                            );
 
-                        // =========================
-                        // upload_data
-                        // =========================
-                        $successInsert[] = [
-                            'norefund_id' => $this->uploadId,
-                            'waybill_no' => $row->waybill_no,
-                            'outbound_date' => $outboundDate,
-                            'customer_reference_no' => $row->customer_reference_no ?? null,
-                            'customer' => $row->customer ?? null,
-                            'from_city' => $row->from_city ?? null,
-                            'origin_branch' => $row->origin_branch ?? null,
-                            'to_city' => $row->to_city ?? null,
-                            'destination_branch' => $row->destination_branch ?? null,
-                            'from_analytic_account' => $row->from_analytic_account,
-                            'to_analytic_account' => $row->to_analytic_account,
-                            'receiver_name' => $row->receiver_name,
-                            'payment_by' => $row->payment_by,
-                            'payment_type' => $row->payment_type,
-                            'service' => $row->service,
-                            'weight' => $row->weight,
-                            'express_income_amount' => $row->express_income_amount,
-                            'cod_total_amount' => $row->cod_total_amount,
-                            'cod_express_income_amount' => $row->cod_express_income_amount,
-                            'cod_income_amount' => $row->cod_income_amount,
-                            'cod_payable_amount' => $row->cod_payable_amount,
-                            'insurance_expense_amount' => $row->insurance_expense_amount,
-                            'refund' => 0,
-                            'service_type' => $row->service_type,
-                            'waybill_status' => $row->waybill_status,
-                            'confirm_date' => $row->confirm_date,
-                            'delivered_date' => $deliveredDate,
-                            'accounting_date' => $accountingDate,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ];
+                            $failedIds[] = $row->id;
+                            $batchFailed++;
+                            continue;
+                        }
 
-                        // =========================
-                        // upload_details table (NEW FEATURE)
-                        // =========================
-                        $uploadDetailsInsert[] = [
-                            'waybill_no' => $row->waybill_no, // fill after insert
-                            'customer_order_reference' => $row->customer_order_reference,
-                            'phone' => $row->phone,
-                            'mobile' => $row->mobile,
-                            'operator' => $row->operator,
-                            'pickup_man' => $row->pickup_man,
-                            'other' => $row->other,
-                            'receiver_mobile' => $row->receiver_mobile,
-                            'receiver_address' => $row->receiver_address,
-                            'recipient_name' => $row->recipient_name,
-                            'recipient_phone' => $row->recipient_phone,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ];
+                        try {
+                            $outboundDate = $this->safeDate($row->outbound_date ?? null);
+                            $deliveredDate = $this->safeDate($row->delivered_date ?? null);
+                            $accountingDate = $this->getAccountingDate($outboundDate, $deliveredDate);
 
-                        $successIds[] = $row->id;
-                        $processed++;
-                    } catch (\Throwable $e) {
+                            $successInsert[] = [
+                                'norefund_id' => $this->uploadId,
+                                'waybill_no' => $waybill,
+                                'outbound_date' => $outboundDate,
+                                'customer_reference_no' => $row->customer_reference_no ?? null,
+                                'customer' => $row->customer ?? null,
+                                'from_city' => $row->from_city ?? null,
+                                'origin_branch' => $row->origin_branch ?? null,
+                                'to_city' => $row->to_city ?? null,
+                                'destination_branch' => $row->destination_branch ?? null,
+                                'from_analytic_account' => $row->from_analytic_account,
+                                'to_analytic_account' => $row->to_analytic_account,
+                                'receiver_name' => $row->receiver_name,
+                                'payment_by' => $row->payment_by,
+                                'payment_type' => $row->payment_type,
+                                'service' => $row->service,
+                                'weight' => $row->weight,
+                                'express_income_amount' => $row->express_income_amount,
+                                'cod_total_amount' => $row->cod_total_amount,
+                                'cod_express_income_amount' => $row->cod_express_income_amount,
+                                'cod_income_amount' => $row->cod_income_amount,
+                                'cod_payable_amount' => $row->cod_payable_amount,
+                                'insurance_expense_amount' => $row->insurance_expense_amount,
+                                'refund' => 0,
+                                'service_type' => $row->service_type,
+                                'waybill_status' => $row->waybill_status,
+                                'confirm_date' => $row->confirm_date,
+                                'delivered_date' => $deliveredDate,
+                                'accounting_date' => $accountingDate,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ];
 
-                        $this->writeFailedFile(
-                            $file,
-                            $fileOpened,
-                            $relativePath,
-                            $waybill,
-                            $e->getMessage()
-                        );
+                            $uploadDetailsInsert[] = [
+                                'waybill_no' => $waybill,
+                                'customer_order_reference' => $row->customer_order_reference,
+                                'phone' => $row->phone,
+                                'mobile' => $row->mobile,
+                                'operator' => $row->operator,
+                                'pickup_man' => $row->pickup_man,
+                                'other' => $row->other,
+                                'receiver_mobile' => $row->receiver_mobile,
+                                'receiver_address' => $row->receiver_address,
+                                'recipient_name' => $row->recipient_name,
+                                'recipient_phone' => $row->recipient_phone,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ];
 
-                        $failedIds[] = $row->id;
+                            $successIds[] = $row->id;
+                            $batchProcessed++;
 
-                        $failed++;
+                        } catch (\Throwable $e) {
+
+                            $this->writeFailedFile(
+                                $file,
+                                $fileOpened,
+                                $relativePath,
+                                $waybill,
+                                $e->getMessage()
+                            );
+
+                            $failedIds[] = $row->id;
+                            $batchFailed++;
+                        }
                     }
                 }
 
-                // =========================
-                // BULK INSERT upload_data
-                // =========================
-                DB::transaction(function () use ($successInsert, $successIds, $failedIds, $uploadDetailsInsert) {
-                    if (!empty($successInsert)) {
+                /**
+                 * STEP 3: DB transaction
+                 */
+                DB::transaction(function () use (
+                    $successInsert,
+                    $uploadDetailsInsert,
+                    $successIds,
+                    $failedIds
+                ) {
 
+                    if (!empty($successInsert)) {
                         DB::table('upload_data')->insert($successInsert);
+                    }
+
+                    if (!empty($uploadDetailsInsert)) {
                         DB::table('upload_details')->insert($uploadDetailsInsert);
                     }
 
@@ -200,49 +219,43 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                     }
                 });
 
+                /**
+                 * STEP 4: correct counters update
+                 */
+                $totalProcessed += $batchProcessed;
+                $totalFailed += $batchFailed;
+
                 $batchDuration = round(microtime(true) - $batchStart, 2);
 
                 DB::table('uploads')
                     ->where('id', $this->uploadId)
                     ->update([
                         'processed_duration' => DB::raw("processed_duration + {$batchDuration}"),
-                        'processed_rows' => DB::raw("processed_rows + " . count($successIds)),
-                        'failed_rows' => DB::raw("failed_rows + " . count($failedIds)),
+                        'processed_rows' => DB::raw("processed_rows + {$batchProcessed}"),
+                        'failed_rows' => DB::raw("failed_rows + {$batchFailed}"),
                         'updated_at' => now(),
                     ]);
             });
 
-        // =========================
-        // CLOSE FILE
-        // =========================
         if ($fileOpened && $file) {
             fclose($file);
         }
 
-        // =========================
-        // CLEANUP (SAFER: only processed/failed)
-        // =========================
         DB::table('staging_all_waybills')
             ->where('upload_id', $this->uploadId)
             ->whereIn('status', ['processed', 'failed'])
             ->delete();
 
-        // =========================
-        // FINAL UPDATE
-        // =========================
-        $endTime = microtime(true);
-
         DB::table('uploads')
             ->where('id', $this->uploadId)
             ->update([
                 'status' => 'completed',
-                'processed_rows' => $processed,
-                'failed_rows' => $failed,
-                'processed_duration' => round($endTime - $startTime, 2),
+                'processed_rows' => $totalProcessed,
+                'failed_rows' => $totalFailed,
+                'processed_duration' => round(microtime(true) - $startTime, 2),
                 'failed_path' => $relativePath,
-                'updated_at' => $now,
+                'updated_at' => now(),
             ]);
-
     }
 
     // =========================

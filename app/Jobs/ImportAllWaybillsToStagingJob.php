@@ -45,7 +45,7 @@ class ImportAllWaybillsToStagingJob implements ShouldQueue
         }
 
         /**
-         * 🔥 PRELOAD analytics (FAST)
+         * PRELOAD analytics (FAST)
          * reference => account
          */
         $analytics = DB::table('analytics')
@@ -84,6 +84,9 @@ class ImportAllWaybillsToStagingJob implements ShouldQueue
                  */
                 $fromRef = trim($row[11] ?? ''); // YGN-SDGN
                 $toRef   = trim($row[13] ?? ''); // MGU
+                $outboundDate = $this->parseDate($row[1] ?? null);
+                $deliveredDate = $this->parseDate($row[31] ?? null);
+                $accountingDate = $this->getAccountingDate($outboundDate, $deliveredDate);
 
                 $batch[] = [
                     'upload_id' => $this->uploadId,
@@ -121,6 +124,7 @@ class ImportAllWaybillsToStagingJob implements ShouldQueue
                     'service_type' => $row[29] ?? null,
                     'waybill_status' => $this->safeStatus($row[30] ?? null),
                     'delivered_date' => $this->parseDate($row[31] ?? null),
+                    'accounting_date' => $this->parseDate($row[31] ?? null),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -141,6 +145,57 @@ class ImportAllWaybillsToStagingJob implements ShouldQueue
                 'status' => 'processing',
                 'total_rows' => $total,
             ]);
+
+            /**
+             * -----------------------------------
+             * CHECK DUPLICATE WAYBILLS
+             * staging_all_waybills vs upload_data
+             * -----------------------------------
+             */
+            $duplicates = DB::table('staging_all_waybills as s')
+                ->join('upload_data as u', 'u.waybill_no', '=', 's.waybill_no')
+                ->where('s.upload_id', $this->uploadId)
+                ->select('s.waybill_no')
+                ->distinct()
+                ->pluck('s.waybill_no')
+                ->toArray();
+
+            if (!empty($duplicates)) {
+
+                $maxShow = 1000;
+
+                $duplicateMessages = array_map(
+                    fn ($waybill) => "Duplicate waybill already exists in database ({$waybill})",
+                    array_slice($duplicates, 0, $maxShow)
+                );
+
+                $errorMessage = implode("\n", $duplicateMessages);
+
+                if (count($duplicates) > $maxShow) {
+                    $errorMessage .= "\n... and " .
+                        (count($duplicates) - $maxShow) .
+                        " more duplicates";
+                }
+
+                $upload->update([
+                    'status' => 'failed',
+                    'error_message' => substr($errorMessage, 0, 65000),
+                ]);
+                
+                /**
+                 * CLEANUP STAGING DATA
+                 */
+                DB::table('staging_all_waybills')
+                    ->where('upload_id', $this->uploadId)
+                    ->delete();
+
+                Log::warning('Duplicate waybills found', [
+                    'upload_id' => $this->uploadId,
+                    'duplicates_count' => count($duplicates),
+                ]);
+
+                return;
+            }
 
             // NEXT JOB CALL
             ProcessStagingWaybillsJob::dispatch(
@@ -199,5 +254,14 @@ class ImportAllWaybillsToStagingJob implements ShouldQueue
         if ($v === null) return null;
         $v = preg_replace('/[\x00-\x1F\x7F]/u', '', $v);
         return $len ? mb_substr(trim($v), 0, $len) : trim($v);
+    }
+
+    private function getAccountingDate($o, $d): ?string
+    {
+        return match ($this->category) {
+            'sender-prepaid' => $o,
+            'sender-postpaid', 'receiver-postpaid', 'sender-foc' => $d,
+            default => null,
+        };
     }
 }

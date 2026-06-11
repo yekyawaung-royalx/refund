@@ -166,10 +166,8 @@ class CheckAllWaybillsFileJob implements ShouldQueue
                 };
 
                 // Duplicate in file
-                $duplicateKey =
-                    $waybill .
-                    '|' .
-                    ($accountingDate ?? 'NULL');
+                $duplicateKey = $waybill;
+                // $duplicateKey = $waybill .'|'.($accountingDate ?? 'NULL');
 
                 if (isset($fileWaybills[$duplicateKey])) {
 
