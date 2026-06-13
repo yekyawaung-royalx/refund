@@ -241,11 +241,6 @@ class ProcessStagingWaybillsJob implements ShouldQueue
             fclose($file);
         }
 
-        DB::table('staging_all_waybills')
-            ->where('upload_id', $this->uploadId)
-            ->whereIn('status', ['processed', 'failed'])
-            ->delete();
-
         DB::table('uploads')
             ->where('id', $this->uploadId)
             ->update([
@@ -256,6 +251,11 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 'failed_path' => $relativePath,
                 'updated_at' => now(),
             ]);
+        
+        DB::table('staging_all_waybills')
+            ->where('upload_id', $this->uploadId)
+            ->whereIn('status', ['processed', 'failed'])
+            ->delete();
     }
 
     // =========================
