@@ -252,10 +252,14 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 'updated_at' => now(),
             ]);
         
+        $deleteStart = microtime(true);
         DB::table('staging_all_waybills')
             ->where('upload_id', $this->uploadId)
             ->whereIn('status', ['processed', 'failed'])
             ->delete();
+        Log::info('staging_delete_time', [
+            'duration' => round(microtime(true) - $deleteStart, 2),
+        ]);
     }
 
     // =========================
