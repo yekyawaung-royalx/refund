@@ -118,6 +118,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notes/mysql-storage-move-ssd200gb', [NoteController::class, 'mysql_storage_move_ssd200gb']);
     Route::get('/notes/daily-export-scheduler-setup', [NoteController::class, 'daily_export_scheduler_setup']);
     Route::get('/notes/csv-import-validation-rules', [NoteController::class, 'csv_import_validation_rules']);
+    Route::get('/notes/configuration', [NoteController::class, 'configuration']);
 
     Route::get('/logs', [LogController::class, 'logs']);
     Route::get('/logs/view', [LogController::class, 'view'])->name('logs.view');

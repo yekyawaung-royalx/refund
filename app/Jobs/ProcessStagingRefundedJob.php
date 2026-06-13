@@ -23,196 +23,172 @@ class ProcessStagingRefundedJob implements ShouldQueue
     ) {}
 
     public function handle()
-    {
-        $startTime = microtime(true);
+{
+    $startTime = microtime(true);
 
-        /**
-         * STEP 1: FETCH CHUNK
-         */
-        $rows = DB::table('staging_refunded')
-            ->where('upload_id', $this->uploadId)
-            ->where('status', 'pending')
-            ->where('id', '>', $this->fromId)
-            ->orderBy('id')
-            ->limit($this->chunkSize)
-            ->get();
+    /**
+     * STEP 1: FETCH CHUNK (staging)
+     */
+    $rows = DB::table('staging_refunded')
+        ->where('upload_id', $this->uploadId)
+        ->where('status', 'pending')
+        ->where('id', '>', $this->fromId)
+        ->orderBy('id')
+        ->limit($this->chunkSize)
+        ->get();
 
-        /**
-         * STEP 2: LAST CHUNK CHECK
-         */
-        if ($rows->isEmpty()) {
-            $this->finalizeJob();
-            return;
-        }
+    if ($rows->isEmpty()) {
+        $this->finalizeJob();
+        return;
+    }
 
-        $waybills = $rows->pluck('waybill_no')->all();
+    $waybills = $rows->pluck('waybill_no')->filter()->unique()->values()->all();
 
-        /**
-         * STEP 3: LOAD upload_data MAP
-         */
-        $uploadMap = DB::table('upload_data')
-            ->whereIn('waybill_no', $waybills)
-            ->get(['waybill_no', 'refund','payment_date','vendor_type'])
-            ->keyBy('waybill_no');
+    /**
+     * STEP 2: MAP upload_data (partition-aware)
+     */
+    $uploadMap = DB::table('upload_data')
+        ->whereIn('waybill_no', $waybills)
+        ->get(['waybill_no', 'refund', 'payment_date', 'vendor_type', 'accounting_date'])
+        ->keyBy('waybill_no');
 
-        $successIds = [];
-        $successWaybills = [];
+    /**
+     * LOG partition hint (estimated)
+     */
+    $partitions = $uploadMap
+        ->pluck('accounting_date')
+        ->filter()
+        ->map(fn ($d) => date('Ym', strtotime($d)))
+        ->unique()
+        ->values()
+        ->all();
 
-        $failedIds = [];
-        $failedReasons = [];
+    \Log::info('upload_data partition scan', [
+        'upload_id' => $this->uploadId,
+        'from_id' => $this->fromId,
+        'partitions_affected' => $partitions,
+        'waybill_count' => count($waybills),
+    ]);
 
-        foreach ($rows as $row) {
-
-            $match = $uploadMap[$row->waybill_no] ?? null;
-
-            if (!$match) {
-                $failedIds[] = $row->id;
-                $failedReasons[$row->id] = 'not_found';
-                continue;
-            }
-
-            if ((int) $match->refund === 1) {
-                $failedIds[] = $row->id;
-                $failedReasons[$row->id] = 'already_refunded';
-                continue;
-            }
-
-            $successIds[] = $row->id;
-            $successWaybills[] = $row->waybill_no;
-        }
-
-        /**
-         * STEP 4: SUCCESS UPDATE
-         */
-        if (!empty($successWaybills)) {
-
-    $updateRows = [];
+    $success = [];
+    $failedIds = [];
+    $failedReasons = [];
 
     foreach ($rows as $row) {
 
-        if (!in_array($row->id, $successIds)) {
+        $match = $uploadMap[$row->waybill_no] ?? null;
+
+        if (!$match) {
+            $failedIds[] = $row->id;
+            $failedReasons[$row->id] = 'not_found';
             continue;
         }
 
-        $data = json_decode($row->row_data, true);
-
-        $paymentDate = null;
-
-        if (!empty($data[2])) {
-            $paymentDate = \Carbon\Carbon::createFromFormat(
-                'm/d/Y',
-                $data[2]
-            )->format('Y-m-d');
+        if ((int) $match->refund === 1) {
+            $failedIds[] = $row->id;
+            $failedReasons[$row->id] = 'already_refunded';
+            continue;
         }
 
-        $updateRows[$row->waybill_no] = [
-            'payment_date' => $paymentDate,
-            'vendor_type'  => $data[6] ?? null,
+        $success[$row->waybill_no] = [
+            'id' => $row->id,
+            'payment_date' => $row->payment_date,
+            'vendor_type'  => $row->vendor_type,
+            'accounting_date' => $match->accounting_date,
         ];
     }
 
-    $paymentDateCases = [];
-    $vendorTypeCases = [];
+    /**
+     * STEP 3: BULK UPDATE upload_data (JOIN + partition pruning)
+     */
+    if (!empty($success)) {
 
-    foreach ($updateRows as $waybill => $values) {
+        $waybills = array_keys($success);
 
-        $waybillEscaped = addslashes($waybill);
+        $waybillList = "'" . implode("','", $waybills) . "'";
 
-        $paymentDate = $values['payment_date'];
-        $vendorType  = addslashes($values['vendor_type'] ?? '');
+        DB::statement("
+            UPDATE upload_data u
+            JOIN staging_refunded s
+                ON u.waybill_no = s.waybill_no
+               AND u.accounting_date = s.accounting_date
+            SET
+                u.refund = 1,
+                u.refund_id = {$this->uploadId},
+                u.payment_date = s.payment_date,
+                u.vendor_type = s.vendor_type,
+                u.updated_at = NOW()
+            WHERE
+                u.refund = 0
+                AND s.upload_id = {$this->uploadId}
+                AND s.status = 'pending'
+                AND u.waybill_no IN ({$waybillList})
+        ");
 
-        $paymentDateCases[] =
-            "WHEN '{$waybillEscaped}' THEN " .
-            ($paymentDate ? "'{$paymentDate}'" : "NULL");
+        /**
+         * STEP 4: UPDATE staging_refunded (BULK, NO LOOP)
+         */
+        $ids = array_column($success, 'id');
 
-        $vendorTypeCases[] =
-            "WHEN '{$waybillEscaped}' THEN '{$vendorType}'";
+        DB::table('staging_refunded')
+            ->whereIn('id', $ids)
+            ->update([
+                'status' => 'processed'
+            ]);
     }
 
-    DB::statement("
-        UPDATE upload_data
-        SET
-            refund = 1,
-            refund_id = {$this->uploadId},
-            payment_date = CASE waybill_no
-                " . implode(' ', $paymentDateCases) . "
-            END,
-            vendor_type = CASE waybill_no
-                " . implode(' ', $vendorTypeCases) . "
-            END,
-            updated_at = NOW()
-        WHERE refund = 0
-        AND waybill_no IN ('" . implode("','", array_keys($updateRows)) . "')
-    ");
+    /**
+     * STEP 5: FAILED UPDATE
+     */
+    if (!empty($failedIds)) {
 
-    DB::table('staging_refunded')
-        ->whereIn('id', $successIds)
-        ->update([
-            'status' => 'processed'
-        ]);
-}
-
-        /**
-         * STEP 5: FAILED UPDATE (BATCH SAFE)
-         */
-        if (!empty($failedIds)) {
-
-            foreach (array_chunk($failedIds, 1000) as $chunk) {
-
-                DB::table('staging_refunded')
-                    ->whereIn('id', $chunk)
-                    ->update([
-                        'status' => 'failed'
-                    ]);
-            }
-
-            /**
-             * save reason (optimized: 1 query per reason type)
-             */
-            $grouped = [];
-
-            foreach ($failedReasons as $id => $reason) {
-                $grouped[$reason][] = $id;
-            }
-
-            foreach ($grouped as $reason => $ids) {
-
-                DB::table('staging_refunded')
-                    ->whereIn('id', $ids)
-                    ->update([
-                        'reason' => $reason
-                    ]);
-            }
-        }
-
-        /**
-         * STEP 6: DURATION TRACKING (FIXED FORMAT)
-         */
-        
-        $endTime = microtime(true);
-        $duration = round($endTime - $startTime, 2);
-
-        DB::table('uploads')
-            ->where('id', $this->uploadId)
-            ->incrementEach([
-                'processed_rows'     => count($successIds),
-                'failed_rows'        => count($failedIds),
-                'processed_duration' => $duration,
+        DB::table('staging_refunded')
+            ->whereIn('id', $failedIds)
+            ->update([
+                'status' => 'failed'
             ]);
 
-        /**
-         * STEP 7: NEXT CHUNK
-         */
-        $lastId = $rows->last()?->id;
+        $grouped = [];
 
-        if ($lastId) {
-            self::dispatch(
-                $this->uploadId,
-                $lastId,
-                $this->chunkSize
-            )->delay(now()->addMilliseconds(100));
+        foreach ($failedReasons as $id => $reason) {
+            $grouped[$reason][] = $id;
+        }
+
+        foreach ($grouped as $reason => $ids) {
+            DB::table('staging_refunded')
+                ->whereIn('id', $ids)
+                ->update([
+                    'reason' => $reason
+                ]);
         }
     }
+
+    /**
+     * STEP 6: TRACKING
+     */
+    $duration = round(microtime(true) - $startTime, 2);
+
+    DB::table('uploads')
+        ->where('id', $this->uploadId)
+        ->incrementEach([
+            'processed_rows'     => count($success),
+            'failed_rows'        => count($failedIds),
+            'processed_duration' => $duration,
+        ]);
+
+    /**
+     * STEP 7: NEXT CHUNK
+     */
+    $lastId = $rows->last()?->id;
+
+    if ($lastId) {
+        self::dispatch(
+            $this->uploadId,
+            $lastId,
+            $this->chunkSize
+        )->delay(now()->addMilliseconds(100));
+    }
+}
 
     /**
      * FINAL STEP
@@ -241,9 +217,9 @@ class ProcessStagingRefundedJob implements ShouldQueue
                 'updated_at' => $now,
             ]);
 
-        DB::table('staging_refunded')
-            ->where('upload_id', $this->uploadId)
-            ->delete();
+        // DB::table('staging_refunded')
+        //     ->where('upload_id', $this->uploadId)
+        //     ->delete();
     }
 
     /**

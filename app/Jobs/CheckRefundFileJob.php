@@ -53,6 +53,7 @@ class CheckRefundFileJob implements ShouldQueue
 
         $rowNumber = 1;
         $errors = [];
+        $fileWaybills = [];
 
         while (!$file->eof()) {
 
@@ -70,7 +71,7 @@ class CheckRefundFileJob implements ShouldQueue
             }
 
             $paymentDate = $row[2];
-            $waybillNo = $row[5];
+            $waybillNo = strtoupper(trim($row[5] ?? ''));
             $amountErrors = $this->validateAmountFormat($row, $rowNumber);
 
             if (!empty($amountErrors)) {
@@ -88,6 +89,17 @@ class CheckRefundFileJob implements ShouldQueue
             if (!$waybillNo) {
                 $errors[] = "Row {$rowNumber}: waybill empty";
             }
+
+            if (isset($fileWaybills[$waybillNo])) {
+                $firstRow = $fileWaybills[$waybillNo];
+                if (count($errors) < 1000) {
+                    $errors[] =
+                        "Row {$rowNumber}: Duplicate waybill in file ({$waybillNo}) first found at row {$firstRow}";
+                }
+
+                continue;
+            }
+            $fileWaybills[$waybillNo] = $rowNumber;
         }
 
         if (!empty($errors)) {

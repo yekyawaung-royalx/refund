@@ -10,6 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class ImportRefundedToStagingJob implements ShouldQueue
 {
@@ -33,14 +34,13 @@ class ImportRefundedToStagingJob implements ShouldQueue
             return;
         }
 
-        $upload->update(['status' => 'staging']);
-
         if (!file_exists($this->filePath)) {
             Log::error('File not found', ['file' => $this->filePath]);
-
             $upload->update(['status' => 'failed']);
             return;
         }
+
+        $upload->update(['status' => 'staging']);
 
         Log::info('IMPORT STARTED', [
             'upload_id' => $this->uploadId,
@@ -52,9 +52,7 @@ class ImportRefundedToStagingJob implements ShouldQueue
         $file->setCsvControl(',');
 
         $file->rewind();
-
-        // skip header safely
-        $file->fgetcsv();
+        $file->fgetcsv(); // skip header
 
         $batchSize = 2000;
         $batch = [];
@@ -62,55 +60,52 @@ class ImportRefundedToStagingJob implements ShouldQueue
         $now = now();
 
         try {
+            while (!$file->eof()) {
 
-            while (($row = $file->fgetcsv()) !== false) {
+                $row = $file->fgetcsv();
 
-                if (!is_array($row) || empty($row)) {
+                if (empty($row) || !is_array($row)) {
                     continue;
                 }
 
-                $waybill = strtoupper(trim($row[5] ?? ''));
+                $waybill = isset($row[5]) ? strtoupper(trim($row[5])) : '';
 
                 if ($waybill === '') {
                     continue;
                 }
 
                 $batch[] = [
-                    'upload_id'   => $this->uploadId,
-                    'waybill_no'  => $waybill,
-                    'row_data'    => json_encode($row),
-                    'status'      => 'pending',
-                    'created_at'  => $now,
-                    'updated_at'  => $now,
+                    'upload_id'    => $this->uploadId,
+                    'waybill_no'   => $waybill,
+                    'amount'       => $this->toFloat($row[0] ?? null),
+                    'payment_date' => $this->parseDate($row[2] ?? null),
+                    'vendor_type'  => isset($row[6]) ? trim($row[6]) : null,
+                    'status'       => 'pending',
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
                 ];
 
                 $total++;
 
-                if (count($batch) >= $batchSize) {
-
-                    $inserted = DB::table('staging_refunded')->insert($batch);
+                if (count($batch) === $batchSize) {
+                    DB::table('staging_refunded')->insert($batch);
 
                     Log::info('BATCH INSERT', [
-                        'count' => count($batch),
-                        'result' => $inserted
+                        'count' => $batchSize
                     ]);
 
                     $batch = [];
                 }
             }
 
-            // final batch insert
             if (!empty($batch)) {
-
-                $inserted = DB::table('staging_refunded')->insert($batch);
+                DB::table('staging_refunded')->insert($batch);
 
                 Log::info('FINAL INSERT', [
-                    'count' => count($batch),
-                    'result' => $inserted
+                    'count' => count($batch)
                 ]);
             }
 
-            // update upload summary
             $upload->update([
                 'total_rows' => $total,
                 'status' => 'processing',
@@ -121,7 +116,6 @@ class ImportRefundedToStagingJob implements ShouldQueue
                 'total_rows' => $total
             ]);
 
-            // NEXT JOB (staging processing)
             ProcessStagingRefundedJob::dispatch($this->uploadId);
         } catch (\Throwable $e) {
 
@@ -137,5 +131,23 @@ class ImportRefundedToStagingJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    private function parseDate($date): ?string
+    {
+        if (!$date) return null;
+
+        try {
+            return Carbon::parse($date)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function toFloat($value): ?float
+    {
+        if ($value === null || $value === '') return null;
+
+        return (float) $value;
     }
 }

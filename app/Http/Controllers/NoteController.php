@@ -32,6 +32,10 @@ class NoteController extends Controller
                 'title' => 'CSV Import Validation Rules',
                 'link' => '/notes/csv-import-validation-rules',
             ],
+            [
+                'title' => 'Configuration PHP, MySQL & Ngnix',
+                'link' => '/notes/configuration',
+            ],
         ];
 
         return Inertia::render('notes/Dashboard', [
@@ -108,6 +112,22 @@ class NoteController extends Controller
     public function csv_import_validation_rules()
     {
         $path = resource_path('js/pages/notes/validation-rules.md');
+
+        if (!file_exists($path)) {
+            abort(404, 'Markdown file not found.');
+        }
+
+        $content = file_get_contents($path);
+
+        // JS safe injection using json_encode
+        $jsSafeContent = json_encode($content);
+
+        return view('notes.show', ['content' => $jsSafeContent]);
+    }
+
+    public function configuration()
+    {
+        $path = resource_path('js/pages/notes/configuration.md');
 
         if (!file_exists($path)) {
             abort(404, 'Markdown file not found.');
