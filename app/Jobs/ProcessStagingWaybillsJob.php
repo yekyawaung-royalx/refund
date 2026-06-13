@@ -82,12 +82,19 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                     /**
                      * STEP 2: partition scoped duplicate check
                      */
+                    $checkStart = microtime(true);
                     $existingWaybills = DB::table('upload_data')
                         ->where('accounting_date', $accountingDate)
                         ->whereIn('waybill_no', $waybills)
                         ->pluck('waybill_no')
                         ->flip()
                         ->toArray();
+
+                    Log::info('duplicate_check_time', [
+                        'accounting_date' => $accountingDate,
+                        'count' => count($waybills),
+                        'duration' => round(microtime(true) - $checkStart, 4),
+                    ]);
 
                     // Log::info('partition_scan', [
                     //     'upload_id' => $this->uploadId,
@@ -199,17 +206,41 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 ) {
 
                     if (!empty($successInsert)) {
+                        $insertStart = microtime(true); // processing start time
+
                         DB::table('upload_data')->insert($successInsert);
+
+                        // processing log
+                        Log::info('upload_data_insert_time', [
+                            'rows' => count($successInsert),
+                            'duration' => round(microtime(true) - $insertStart, 4),
+                        ]);
                     }
 
                     if (!empty($uploadDetailsInsert)) {
+                        $detailInsertStart = microtime(true); // processing start time
+
                         DB::table('upload_details')->insert($uploadDetailsInsert);
+
+                        // processing log
+                        Log::info('upload_details_insert_time', [
+                            'rows' => count($uploadDetailsInsert),
+                            'duration' => round(microtime(true) - $detailInsertStart, 4),
+                        ]);
                     }
 
                     if (!empty($successIds)) {
+                        $updateStart = microtime(true); // processing start time
+
                         DB::table('staging_all_waybills')
                             ->whereIn('id', $successIds)
                             ->update(['status' => 'processed']);
+
+                        // processing log
+                        Log::info('status_update_time', [
+                            'rows' => count($successIds),
+                            'duration' => round(microtime(true) - $updateStart, 4),
+                        ]);
                     }
 
                     if (!empty($failedIds)) {
@@ -252,11 +283,14 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 'updated_at' => now(),
             ]);
         
+        // Delete staging data
         $deleteStart = microtime(true);
+
         DB::table('staging_all_waybills')
             ->where('upload_id', $this->uploadId)
             ->whereIn('status', ['processed', 'failed'])
             ->delete();
+
         Log::info('staging_delete_time', [
             'duration' => round(microtime(true) - $deleteStart, 2),
         ]);
