@@ -258,14 +258,14 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
                 $batchDuration = round(microtime(true) - $batchStart, 2);
 
-                DB::table('uploads')
-                    ->where('id', $this->uploadId)
-                    ->update([
-                        'processed_duration' => DB::raw("processed_duration + {$batchDuration}"),
-                        'processed_rows' => DB::raw("processed_rows + {$batchProcessed}"),
-                        'failed_rows' => DB::raw("failed_rows + {$batchFailed}"),
-                        'updated_at' => now(),
-                    ]);
+                // DB::table('uploads')
+                //     ->where('id', $this->uploadId)
+                //     ->update([
+                //         'processed_duration' => DB::raw("processed_duration + {$batchDuration}"),
+                //         'processed_rows' => DB::raw("processed_rows + {$batchProcessed}"),
+                //         'failed_rows' => DB::raw("failed_rows + {$batchFailed}"),
+                //         'updated_at' => now(),
+                //     ]);
             });
 
         if ($fileOpened && $file) {
