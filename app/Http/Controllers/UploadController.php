@@ -155,6 +155,20 @@ class UploadController extends Controller
             ->paginate(200)
             ->withQueryString();
 
+        $waybills = collect($results->items())
+            ->pluck('waybill_no')
+            ->filter()
+            ->toArray();
+
+        $details = DB::table('upload_details')
+            ->whereIn('waybill_no', $waybills)
+            ->get()
+            ->keyBy('waybill_no');
+
+        foreach ($results->items() as $item) {
+            $item->detail = $details[$item->waybill_no] ?? null;
+        }
+
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 
         return Inertia::render('refunds/ViewUploadedFile', [
@@ -181,6 +195,7 @@ class UploadController extends Controller
 
         // Delete related upload_data records
         DB::table('upload_data')->where('norefund_id', $id)->delete();
+        DB::table('upload_details')->where('upload_id', $id)->delete();
 
         // Delete upload record itself
         $upload->delete();

@@ -27,23 +27,13 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
     public function handle()
     {
-        $startTime = microtime(true);
         $now = now();
-
-        $file = null;
-        $fileOpened = false;
-        $relativePath = null;
 
         DB::table('staging_all_waybills')
             ->where('upload_id', $this->uploadId)
             ->where('status', 'pending')
             ->orderBy('id')
-            ->chunkById($this->batchSize, function ($rows) use (
-                $now,
-                &$file,
-                &$fileOpened,
-                &$relativePath
-            ) {
+            ->chunkById($this->batchSize, function ($rows) use ($now) {
 
                 $batchStart = microtime(true);
 
@@ -56,70 +46,50 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 $batchFailed = 0;
 
                 /**
-                 * STEP 1: normalize + group
+                 * STEP 1: PRE-NORMALIZE
                  */
-                $rowsByDate = $rows->groupBy(function ($row) {
-                    return $this->getAccountingDate(
-                        $this->safeDate($row->outbound_date ?? null),
-                        $this->safeDate($row->delivered_date ?? null)
-                    );
-                });
+                $normalized = [];
 
-                foreach ($rowsByDate as $accountingDate => $groupRows) {
+                foreach ($rows as $row) {
 
-                    $waybills = $groupRows
-                        ->pluck('waybill_no')
-                        ->filter()
-                        ->unique()
-                        ->values()
-                        ->all();
+                    $outboundDate = $this->safeDate($row->outbound_date ?? null);
+                    $deliveredDate = $this->safeDate($row->delivered_date ?? null);
 
-                    /**
-                     * STEP 2: duplicate check (ONE QUERY ONLY)
-                     */
-                    $existing = DB::table('upload_data')
-                        ->where('accounting_date', $accountingDate)
-                        ->whereIn('waybill_no', $waybills)
-                        ->pluck('waybill_no')
-                        ->flip()
-                        ->toArray();
+                    $accountingDate = $this->getAccountingDate($outboundDate, $deliveredDate);
 
-                    foreach ($groupRows as $row) {
+                    $normalized[] = [
+                        'row' => $row,
+                        'outboundDate' => $outboundDate,
+                        'deliveredDate' => $deliveredDate,
+                        'accountingDate' => $accountingDate,
+                    ];
+                }
 
+                /**
+                 * STEP 2: GROUP
+                 */
+                $groups = [];
+
+                foreach ($normalized as $data) {
+                    $groups[$data['accountingDate']][] = $data;
+                }
+
+                /**
+                 * STEP 3: PROCESS
+                 */
+                foreach ($groups as $accountingDate => $items) {
+
+                    foreach ($items as $item) {
+
+                        $row = $item['row'];
                         $waybill = $row->waybill_no;
 
-                        $outboundDate = $this->safeDate($row->outbound_date ?? null);
-                        $deliveredDate = $this->safeDate($row->delivered_date ?? null);
-                        $accountingDate = $this->getAccountingDate($outboundDate, $deliveredDate);
-
-                        /**
-                         * ❌ DUPLICATE CASE
-                         */
-                        if (isset($existing[$waybill])) {
-
-                            $this->writeFailedFile(
-                                $file,
-                                $fileOpened,
-                                $relativePath,
-                                $waybill,
-                                'DUPLICATE'
-                            );
-
-                            $failedIds[] = $row->id;
-                            $batchFailed++;
-
-                            continue;
-                        }
-
-                        /**
-                         * ✅ SUCCESS CASE
-                         */
                         try {
 
                             $successInsert[] = [
                                 'norefund_id' => $this->uploadId,
                                 'waybill_no' => $waybill,
-                                'outbound_date' => $outboundDate,
+                                'outbound_date' => $item['outboundDate'],
                                 'customer_reference_no' => $row->customer_reference_no ?? null,
                                 'customer' => $row->customer ?? null,
                                 'from_city' => $row->from_city ?? null,
@@ -138,12 +108,12 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                                 'cod_express_income_amount' => $row->cod_express_income_amount,
                                 'cod_income_amount' => $row->cod_income_amount,
                                 'cod_payable_amount' => $row->cod_payable_amount,
-                                'insurance_expense_amount' => $row->insurance_expense_amount,
+                                'insurance_expense_amount' => 0,
                                 'refund' => 0,
                                 'service_type' => $row->service_type,
                                 'waybill_status' => $row->waybill_status,
                                 'confirm_date' => $row->confirm_date,
-                                'delivered_date' => $deliveredDate,
+                                'delivered_date' => $item['deliveredDate'],
                                 'accounting_date' => $accountingDate,
                                 'created_at' => $now,
                                 'updated_at' => $now,
@@ -171,14 +141,6 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
                         } catch (\Throwable $e) {
 
-                            $this->writeFailedFile(
-                                $file,
-                                $fileOpened,
-                                $relativePath,
-                                $waybill,
-                                $e->getMessage()
-                            );
-
                             $failedIds[] = $row->id;
                             $batchFailed++;
                         }
@@ -186,18 +148,70 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 }
 
                 /**
-                 * STEP 3: DB TRANSACTION
+                 * STEP 4: TIMING SPLIT (IMPORTANT PART)
                  */
+
+                // processing time (everything before DB writes)
+                $processDuration = microtime(true) - $batchStart;
+
+                /**
+                 * DB WRITE START (ONLY INSERT TIME)
+                 */
+                $dbStart = microtime(true);
+
+                $uploadDataDuration = 0;
+                $uploadDetailsDuration = 0;
+
                 DB::transaction(function () use (
                     $successInsert,
+                    $uploadDetailsInsert,
                     $successIds,
-                    $failedIds
+                    $failedIds,
+                    &$uploadDataDuration,
+                    &$uploadDetailsDuration
                 ) {
 
+                    /**
+                     * upload_data insert (TRACK ONLY THIS)
+                     */
                     if (!empty($successInsert)) {
-                        DB::table('upload_data')->insert($successInsert);
+
+                        $t0 = microtime(true);
+
+                        foreach (array_chunk($successInsert, 2000) as $chunk) {
+                            DB::table('upload_data')->insert($chunk);
+                        }
+
+                        $uploadDataDuration = microtime(true) - $t0;
+
+                        Log::info('upload_data_insert_stats', [
+                            'rows' => count($successInsert),
+                            'duration' => round($uploadDataDuration, 4),
+                        ]);
                     }
 
+                    /**
+                     * upload_details insert (LOG ONLY, NOT COUNTED)
+                     */
+                    if (!empty($uploadDetailsInsert)) {
+
+                        $t1 = microtime(true);
+
+                        foreach (array_chunk($uploadDetailsInsert, 2000) as $chunk) {
+                            DB::table('upload_details')->insert($chunk);
+                        }
+
+                        $uploadDetailsDuration = microtime(true) - $t1;
+
+                        Log::info('upload_details_insert_stats', [
+                            'rows' => count($uploadDetailsInsert),
+                            'duration' => round($uploadDetailsDuration, 4),
+                        ]);
+                    }
+
+                    /**
+                     * staging update
+                     */
                     if (!empty($successIds)) {
                         DB::table('staging_all_waybills')
                             ->whereIn('id', $successIds)
@@ -212,33 +226,23 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 });
 
                 /**
-                 * STEP 4: DETAILS JOB (AFTER COMMIT SAFE)
-                 */
-                DB::afterCommit(function () use ($uploadDetailsInsert) {
-                    if (!empty($uploadDetailsInsert)) {
-                        InsertUploadDetailsJob::dispatch($uploadDetailsInsert);
-                    }
-                });
-
-                /**
-                 * STEP 5: ACCURATE COUNTERS (IMPORTANT FIX)
+                 * STEP 5: UPDATE uploads TABLE (ONLY upload_data INSERT TIME INCLUDED)
                  */
                 DB::table('uploads')
                     ->where('id', $this->uploadId)
-                    ->increment('processed_rows', $batchProcessed);
+                    ->update([
+                        'processed_rows' => DB::raw("processed_rows + {$batchProcessed}"),
+                        'failed_rows' => DB::raw("failed_rows + {$batchFailed}"),
 
-                DB::table('uploads')
-                    ->where('id', $this->uploadId)
-                    ->increment('failed_rows', $batchFailed);
+                        // ONLY THIS IS COUNTED
+                        'processed_duration' => DB::raw(
+                            "processed_duration + " . round($processDuration + $uploadDataDuration, 4)
+                        ),
 
-                DB::table('uploads')
-                    ->where('id', $this->uploadId)
-                    ->increment('processed_duration', round(microtime(true) - $batchStart, 2));
+                        'updated_at' => $now,
+                    ]);
             });
 
-        /**
-         * FINAL STATUS ONLY (NO COUNTER OVERRIDE)
-         */
         DB::table('uploads')
             ->where('id', $this->uploadId)
             ->update([
@@ -246,9 +250,6 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                 'updated_at' => now(),
             ]);
 
-        /**
-         * CLEANUP STAGING
-         */
         DB::table('staging_all_waybills')
             ->where('upload_id', $this->uploadId)
             ->whereIn('status', ['processed', 'failed'])

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Jobs\ExportExpressFileJob;
 use App\Jobs\ExportSameDayFileJob;
+use App\Jobs\DailyRefundSummaryJob;
 
 class RefundController extends Controller
 {
@@ -380,10 +381,13 @@ class RefundController extends Controller
 
     public function recent_refund_summaries()
     {
+        $date = '';
         $recent_refund_summaries = DB::table('refund_summaries')
             ->orderBy('id', 'desc')
             ->limit(10)
             ->get();
+
+        DailyRefundSummaryJob::dispatch($date);
 
         return response()->json($recent_refund_summaries);
     }
@@ -427,6 +431,20 @@ class RefundController extends Controller
         }
 
         $refunds = $refundsQuery->paginate(200)->withQueryString(); // preserve filter/query in pagination
+        
+        $waybills = collect($refunds->items())
+            ->pluck('waybill_no')
+            ->filter()
+            ->toArray();
+
+        $details = DB::table('upload_details')
+            ->whereIn('waybill_no', $waybills)
+            ->get()
+            ->keyBy('waybill_no');
+
+        foreach ($refunds->items() as $item) {
+            $item->detail = $details[$item->waybill_no] ?? null;
+        }
 
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
 
@@ -436,6 +454,8 @@ class RefundController extends Controller
             'search'            => $queryValue,
             'filter_by'         => $filterBy, // current filter param
         ]);
+
+        
     }
 
 

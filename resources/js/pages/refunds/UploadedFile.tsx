@@ -138,7 +138,12 @@ export default function UploadedFile() {
           </Badge>
         );
       default:
-        return <Badge>{status}</Badge>;
+        return (
+          <Badge className="bg-yellow-500 text-white flex items-center gap-1">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {status}
+          </Badge>
+        );
     }
   };
 

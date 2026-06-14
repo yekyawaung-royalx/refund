@@ -74,8 +74,23 @@ export interface UploadDataItem {
   export_id: number | null;
   created_at: string;
   updated_at: string;
-
+  detail?: UploadDataDetail;
   [key: string]: unknown;
+}
+
+interface UploadDataDetail {
+    phone: string;
+    mobile: string;
+    operator: string;
+    pickup_man: string;
+    from_city: string;
+    to_city: string;
+    other: string;
+    receiver_name: string;
+    receiver_mobile: string;
+    receiver_address: string;
+    recipient_name: string;
+    recipient_phone: string;
 }
 
 export interface UploadDataPagination {
@@ -95,20 +110,76 @@ interface FileData {
 }
 
 export default function ViewUploadedFile() {
-  const { results, file, execution_time_ms, used_partitions, uploadId, search: initialSearch } =
+  const { results, file, execution_time_ms, uploadId, search: initialSearch } =
     usePage<{ results: UploadDataPagination; file: FileData ; execution_time_ms: number; used_partitions: number; uploadId: number; search?: string }>().props;
 
   const [search, setSearch] = React.useState(initialSearch || "");
-  const data: UploadDataItem[] = results?.data ?? [];
+  
+  const data: UploadDataItem[] = (results?.data ?? []).map((item: UploadDataItem) => ({
+        ...item,
+        ...(item.detail ?? {}),
+    }));
+  
+    const columnOrder = [
+  "norefund_id",
+  "refund_id",
+  "outbound_date",
+  "customer_order_reference",
+  "customer_reference_no",
+  "customer",
+  "phone",
+  "mobile",
+  "operator",
+  "pickup_man",
+  "waybill_no",
+  "from_city",
+  "origin_branch",
+  "from_analytic_account",
+  "to_city",
+  "destination_branch",
+  "to_analytic_account",
+  "payment_by",
+  "payment_type",
+  "other",
+  "receiver_name",
+  "receiver_mobile",
+  "receiver_address",
+  "recipient_name",
+  "recipient_phone",
+  "service",
+  "weight",
+  "express_income_amount",
+  "cod_total_amount",
+  "cod_express_income_amount",
+  "cod_income_amount",
+  "cod_payable_amount",
+  "refund",
+  "service_type",
+  "waybill_status",
+  "delivered_date",
+  "confirm_date",
+  "payment_date",
+  "accounting_date",
+  "export_id",
+  "branch_bank_deposit_export",
+  "cod_refund_export",
+  "sender_receiver_export",
+  "created_at",
+  "updated_at"
+];
 
-  const allColumns: string[] =
-      data.length > 0 ? Object.keys(data[0]) : [];
+ const allColumns: string[] = columnOrder.filter(
+  (col) => data.length > 0 && col in data[0]
+);
 
-      // hide columns
-  const hideColumnIndexes = [0, 4, 7, 21, 23,];
-  const initialInvisibleColumns = hideColumnIndexes
-    .map((i) => allColumns[i])
-    .filter((col): col is string => Boolean(col));
+// hide columns
+  const hideColumnIndexes = [3, 6, 7, 19, 22, 23, 24, 40, 41, 42];
+  const initialInvisibleColumns = [
+      "detail",
+      ...hideColumnIndexes
+          .map(i => allColumns[i])
+          .filter(Boolean),
+  ];
   
   
     const [invisibleColumns, setInvisibleColumns] = React.useState<string[]>(initialInvisibleColumns);
@@ -209,54 +280,54 @@ export default function ViewUploadedFile() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {data.length > 0 &&
-                    Object.keys(data[0])
-                      .filter((col) => !invisibleColumns.includes(col))
-                      .map((col) => (
-                        <TableHead
-                          key={col}
-                          className={cn("truncate", "w-[150px]")}
-                        >
-                          {col}
-                        </TableHead>
-                      ))}
-                </TableRow>
+                      {data.length > 0 &&
+                              allColumns
+                                .filter((col) => !invisibleColumns.includes(col))
+                                .map((col) => (
+                                  <TableHead
+                                    key={col}
+                                    className={cn("truncate", "w-[150px]")}
+                                  >
+                                    {col}
+                                  </TableHead>
+                                ))}
+                    </TableRow>
               </TableHeader>
             
               <TableBody>
               {data.length > 0 ? (
                 data.map((item, idx) => (
                   <TableRow key={idx}>
-                    {Object.keys(item)
-                      .filter((col) => !invisibleColumns.includes(col))
-                      .map((col) => (
-                        <TableCell key={col} className={cn("truncate", "w-[150px]")}>
-                          {col === "refund" ? (
-                            <span
-                              className={cn(
-                                "px-2 py-1 rounded-full font-semibold text-xs",
-                                item.refund === 1
-                                 ? "border border-green-600 text-green-600 bg-transparent rounded-2xl"
-                                  : "border border-amber-600 text-amber-600 bg-transparent rounded-2xl"
-                              )}
-                            >
-                              {item.refund === 1 ? "Refunded" : "No Refund"}
-                            </span>
-                          ) : col === "waybill_no" ? (
-                            <span
-                              className={cn(
-                                "px-2 py-1 rounded-full font-semibold",
-                                item.refund === 1 ? "text-green-500" : "text-red-500"
-                              )}
-                            >
-                              {displayValue(item[col])}
-                            </span>
-                          ) : (
-                            displayValue(item[col])
-                          )}
-                        </TableCell>
-                      ))}
-                  </TableRow>
+                                {allColumns
+                                  .filter((col) => !invisibleColumns.includes(col))
+                                  .map((col) => (
+                                    <TableCell key={col} className={cn("truncate", "w-[150px]")}>
+                                      {col === "refund" ? (
+                                        <span
+                                          className={cn(
+                                            "px-2 py-1 rounded-full font-semibold text-xs",
+                                            item.refund === 1
+                                              ? "border border-green-600 text-green-600 bg-transparent rounded-2xl"
+                                              : "border border-amber-600 text-amber-600 bg-transparent rounded-2xl"
+                                          )}
+                                        >
+                                          {item.refund === 1 ? "Refund" : "No Refund"}
+                                        </span>
+                                      ) : col === "waybill_no" ? (
+                                        <span
+                                          className={cn(
+                                            "px-2 py-1 rounded-full font-semibold",
+                                            item.refund === 1 ? "text-green-500" : "text-red-500"
+                                          )}
+                                        >
+                                          {displayValue(item[col])}
+                                        </span>
+                                      ) : (
+                                        displayValue(item[col])
+                                      )}
+                                    </TableCell>
+                                  ))}
+                              </TableRow>
                 ))
               ) : (
                 <TableRow>
