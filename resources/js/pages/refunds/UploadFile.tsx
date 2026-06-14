@@ -426,17 +426,17 @@ React.useEffect(() => {
                 <li>Maximum file size: <strong className="text-amber-600">80 MB</strong>.</li>
                 <li>Maximum rows per file: <strong className="text-amber-600">200,000</strong>.</li>
                 <li>Ensure data columns match required format.</li>
-                <li>Select correct category <strong className="text-amber-600">No Refund</strong> or <strong className="text-amber-600">Refund</strong> before uploading.</li>
+                <li>Select correct category <strong className="text-amber-600">All Waybills</strong> or <strong className="text-amber-600">Refunded</strong> before uploading.</li>
                 <li>Do not upload duplicate reports.</li>
                 <li>
-                <strong className="text-amber-600">No Refund</strong>: a refund needs <span className="text-red-500">to be processed</span>.
+                <strong className="text-amber-600">All Waybills</strong>: a refund needs <span className="text-red-500">to be processed</span>.
                 <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
                   <li>Must be 33 columns in the file</li>
                 </ul>
               </li>
 
               <li>
-                <strong className="text-amber-600">Refund</strong>: a refund has <span className="text-green-500">already been processed</span>.
+                <strong className="text-amber-600">Refunded</strong>: a refund has <span className="text-green-500">already been processed</span>.
                 <ul className="list-disc pl-5 mt-1 text-sm text-muted-foreground">
                   <li>Must be 7 columns in the file</li>
                 </ul>
