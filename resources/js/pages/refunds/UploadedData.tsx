@@ -211,7 +211,7 @@ const columnOrder = [
   const categories = [
     { label: "All", value: "all" },
     { label: "No Refund", value: "no-refund" },
-    { label: "Refund", value: "refund" },
+    { label: "Refunded", value: "refunded" },
   ];
   const payment_by = [
     { label: "All", value: "all" },
@@ -553,7 +553,7 @@ const columnOrder = [
                       : "border border-amber-600 text-amber-600 bg-transparent rounded-2xl"
                   )}
                 >
-                  {item.refund === 1 ? "Refund" : "No Refund"}
+                  {item.refund === 1 ? "Refunded" : "No Refund"}
                 </span>
               ) : col === "waybill_no" ? (
                 <span

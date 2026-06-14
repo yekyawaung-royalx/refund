@@ -311,7 +311,7 @@ export default function ViewUploadedFile() {
                                               : "border border-amber-600 text-amber-600 bg-transparent rounded-2xl"
                                           )}
                                         >
-                                          {item.refund === 1 ? "Refund" : "No Refund"}
+                                          {item.refund === 1 ? "Refunded" : "No Refund"}
                                         </span>
                                       ) : col === "waybill_no" ? (
                                         <span

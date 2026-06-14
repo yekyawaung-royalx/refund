@@ -144,7 +144,7 @@ class RefundController extends Controller
             $query->where('refund', 0);
         }
 
-        if ($category === 'refund') {
+        if ($category === 'refunded') {
             $query->where('refund', 1);
         }
 
