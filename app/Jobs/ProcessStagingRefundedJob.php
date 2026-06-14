@@ -128,18 +128,26 @@ class ProcessStagingRefundedJob implements ShouldQueue
         /**
          * STEP 8: FINAL UPDATE
          */
-        $duration = round(microtime(true) - $startTime, 2);
+        $batchDuration = microtime(true) - $startTime;
 
         DB::table('uploads')
             ->where('id', $this->uploadId)
             ->update([
                 'status' => 'completed',
+
                 'processed_rows' => $summary->success_count ?? 0,
                 'failed_rows' => $summary->failed_count ?? 0,
-                'processed_duration' => $duration,
+
+                // 👇 HERE IS THE CORRECT PLACE
+                'processed_duration' => $batchDuration,
+
                 'failed_path' => $failedPath,
                 'updated_at' => now(),
             ]);
+
+        DB::table('staging_refunded')
+            ->where('upload_id', $this->uploadId)
+            ->delete();
     }
 
     /**
