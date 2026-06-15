@@ -61,6 +61,7 @@ php artisan optimize:clear
 npm run build
 sudo systemctl restart php8.3-fpm
 sudo systemctl restart nginx
+sudo supervisorctl restart all
 ```
 
 ---

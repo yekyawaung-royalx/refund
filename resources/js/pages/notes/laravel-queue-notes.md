@@ -52,20 +52,26 @@ Create or update at `nano /etc/supervisor/conf.d/laravel-worker.conf`:
 
 ```ini
 [program:laravel-default]
-command=/usr/bin/php /var/www/refund/artisan queue:work --queue=default
-numprocs=1
+process_name=%(program_name)s_%(process_num)02d
+command=/usr/bin/php /var/www/refund/artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=120 --memory=256 --max-jobs=100
 autostart=true
 autorestart=true
+numprocs=2
+user=www-data
+redirect_stderr=true
 stdout_logfile=/var/www/refund/storage/logs/default-worker.log
-stderr_logfile=/var/www/refund/storage/logs/default-worker-error.log
+stopwaitsecs=180
 
 [program:laravel-import]
-command=/usr/bin/php /var/www/refund/artisan queue:work --queue=import
-numprocs=2
+process_name=%(program_name)s_%(process_num)02d
+command=/usr/bin/php /var/www/refund/artisan queue:work redis --queue=import --sleep=1 --tries=3 --timeout=120 --memory=256 --max-jobs=100
 autostart=true
 autorestart=true
+numprocs=2
+user=www-data
+redirect_stderr=true
 stdout_logfile=/var/www/refund/storage/logs/import-worker.log
-stderr_logfile=/var/www/refund/storage/logs/import-worker-error.log
+stopwaitsecs=180
 ```
 
 - Workers split by queue:

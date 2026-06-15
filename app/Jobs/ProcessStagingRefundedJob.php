@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProcessStagingRefundedJob implements ShouldQueue
 {
@@ -158,9 +159,11 @@ class ProcessStagingRefundedJob implements ShouldQueue
          * STEP 9
          * CLEANUP
          */
+        Log::info('CLEANUP START');
         DB::table('staging_refunded')
             ->where('upload_id', $this->uploadId)
             ->delete();
+        Log::info('CLEANUP DONE');
     }
 
     /**
@@ -189,6 +192,10 @@ class ProcessStagingRefundedJob implements ShouldQueue
                 'failed_path' => $failedPath,
                 'updated_at' => $now,
             ]);
+
+        DB::table('staging_refunded')
+            ->where('upload_id', $this->uploadId)
+            ->delete();
     }
 
     /**
