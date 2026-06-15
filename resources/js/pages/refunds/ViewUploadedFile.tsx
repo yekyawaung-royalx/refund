@@ -140,6 +140,7 @@ export default function ViewUploadedFile() {
   "to_analytic_account",
   "payment_by",
   "payment_type",
+  "vendor_type",
   "other",
   "receiver_name",
   "receiver_mobile",
@@ -173,7 +174,7 @@ export default function ViewUploadedFile() {
 );
 
 // hide columns
-  const hideColumnIndexes = [3, 6, 7, 19, 22, 23, 24, 40, 41, 42];
+  const hideColumnIndexes = [3, 6, 7, 20, 22, 23, 24, 27, 40, 41, 42];
   const initialInvisibleColumns = [
       "detail",
       ...hideColumnIndexes
