@@ -42,10 +42,12 @@ class ImportRefundedToStagingJob implements ShouldQueue
 
         $upload->update(['status' => 'staging']);
 
+        /*
         Log::info('IMPORT STARTED', [
             'upload_id' => $this->uploadId,
             'file' => $this->filePath
         ]);
+        */
 
         $file = new \SplFileObject($this->filePath);
         $file->setFlags(\SplFileObject::READ_CSV);
@@ -90,20 +92,12 @@ class ImportRefundedToStagingJob implements ShouldQueue
                 if (count($batch) === $batchSize) {
                     DB::table('staging_refunded')->insert($batch);
 
-                    Log::info('BATCH INSERT', [
-                        'count' => $batchSize
-                    ]);
-
                     $batch = [];
                 }
             }
 
             if (!empty($batch)) {
                 DB::table('staging_refunded')->insert($batch);
-
-                Log::info('FINAL INSERT', [
-                    'count' => count($batch)
-                ]);
             }
 
             $upload->update([
@@ -116,7 +110,7 @@ class ImportRefundedToStagingJob implements ShouldQueue
                 'total_rows' => $total
             ]);
 
-            ProcessStagingRefundedJob::dispatch($this->uploadId);
+            PrepareStagingRefundedJob::dispatch($this->uploadId);
         } catch (\Throwable $e) {
 
             Log::error('IMPORT FAILED', [

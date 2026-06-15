@@ -24,7 +24,12 @@ innodb_flush_log_at_trx_commit = 2
 tmp_table_size = 256M
 max_heap_table_size = 256M
 max_connections = 200
-max_binlog_size   = 100M
+
+join_buffer_size = 4M
+sort_buffer_size = 4M
+read_buffer_size = 1M
+sync_binlog = 10
+binlog_expire_logs_seconds = 259200
 log_error = /var/log/mysql/error.log
 ```
 ---

@@ -184,10 +184,12 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
                         $uploadDataDuration = microtime(true) - $t0;
 
+                        /*
                         Log::info('upload_data_insert_stats', [
                             'rows' => count($successInsert),
                             'duration' => round($uploadDataDuration, 4),
                         ]);
+                        */
                     }
 
                     /**
@@ -203,10 +205,12 @@ class ProcessStagingWaybillsJob implements ShouldQueue
 
                         $uploadDetailsDuration = microtime(true) - $t1;
 
+                        /*
                         Log::info('upload_details_insert_stats', [
                             'rows' => count($uploadDetailsInsert),
                             'duration' => round($uploadDetailsDuration, 4),
                         ]);
+                        */
                     }
 
                     /**
