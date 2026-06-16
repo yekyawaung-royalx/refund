@@ -328,14 +328,16 @@ class RefundController extends Controller
         return response()->download($filePath, $export->filename);
     }
 
-
     public function view_exported_file($id)
     {
         $export = Export::findOrFail($id);
+        $search = trim(request('search', ''));
+        $page   = max((int) request('page', 1), 1);
+        $perPage = 200;
 
+        // Demo fixed (you can replace with DB later)
         // created_at → 2026-03
         $date = Carbon::parse($export->created_at)->format('Y-m');
-
         $filename = $export->filename;
 
         $filePath = storage_path("app/private/exports/{$date}/{$filename}");
@@ -344,29 +346,76 @@ class RefundController extends Controller
             abort(404, 'File not found');
         }
 
-        $rows = [];
-
         $file = new \SplFileObject($filePath);
         $file->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY);
         $file->setCsvControl(",");
 
-        foreach ($file as $row) {
+        /**
+         * HEADER
+         */
+        $file->rewind();
+        $headers = $file->current();
 
-            if ($row === [null]) {
+        /**
+         * SCAN CSV (SEARCH + COUNT)
+         */
+        $rowsBuffer = [];
+        $totalRows = 0;
+
+        $file->rewind();
+
+        foreach ($file as $index => $row) {
+
+            if (!is_array($row)) {
                 continue;
             }
 
-            $rows[] = $row;
+            if ($row === [null] || $index === 0) {
+                continue;
+            }
+
+            if ($search !== '') {
+
+                $found = false;
+
+                foreach ($row as $cell) {
+                    if (stripos((string)$cell, $search) !== false) {
+                        $found = true;
+                        break;
+                    }
+                }
+
+                if (!$found) {
+                    continue;
+                }
+            }
+
+            $rowsBuffer[] = $row;
+            $totalRows++;
         }
 
-        $headers = array_shift($rows);
-        
-        //return $rows;
-        //exit;
+        /**
+         * PAGINATION SLICE
+         */
+        $offset = ($page - 1) * $perPage;
+
+        $pageRows = array_slice(
+            $rowsBuffer,
+            $offset,
+            $perPage
+        );
+
+        $totalPages = (int) ceil($totalRows / $perPage);
+
         return Inertia::render('refunds/ViewExportedFile', [
-            'filename' => $filename,
-            'headers' => $headers,
-            'rows' => $rows ?? []
+            'filename'   => $filename,
+            'headers'    => $headers,
+            'rows'       => $pageRows,
+            'page'       => $page,
+            'perPage'    => $perPage,
+            'search'     => $search,
+            'totalRows'  => $totalRows,
+            'totalPages' => $totalPages,
         ]);
     }
 

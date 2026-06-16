@@ -1,13 +1,12 @@
 "use client";
-
-import * as React from "react";
+import { useState } from "react";
 import AppLayout from "@/layouts/app-layout";
-import { Head, usePage } from "@inertiajs/react";
+import { Head, usePage, router } from "@inertiajs/react";
 import { type BreadcrumbItem } from "@/types";
 import { PageProps as InertiaPageProps } from "@inertiajs/core";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 import {
   Table,
@@ -17,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Dashboard", href: "/dashboard" },
@@ -27,52 +27,25 @@ const breadcrumbs: BreadcrumbItem[] = [
 interface PageProps extends InertiaPageProps {
   filename: string;
   headers: string[];
-  rows: unknown;
+  rows: string[][];
+  page: number;
+  perPage: number;
+  totalRows: number;
+  totalPages: number;
+  search: string;
 }
 
 export default function View() {
-  const { filename, headers, rows } =  usePage<PageProps>().props;
-
-  const [search, setSearch] = React.useState("");
-  const [page, setPage] = React.useState(1);
-
-  const perPage = 200;
-
-  const safeRows = React.useMemo(() => {
-    if (!Array.isArray(rows)) {
-      return [];
-    }
-
-    return rows.filter(
-      (row): row is string[] =>
-        Array.isArray(row)
-    );
-  }, [rows]);
-
-  // search filter
-  const filteredRows = React.useMemo(() => {
-    if (!search) return safeRows;
-
-    return safeRows.filter((row) =>
-      row.some((cell) =>
-        String(cell)
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      )
-    );
-  }, [search, safeRows]);
-
-  // pagination
-  const totalPages = Math.ceil(filteredRows.length / perPage);
-
-  const paginatedRows = filteredRows.slice(
-    (page - 1) * perPage,
-    page * perPage
-  );
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [search]);
+  const {
+    filename,
+    headers,
+    rows,
+    page,
+    totalRows,
+    totalPages,
+    search,
+  } = usePage<PageProps>().props;
+  const [keyword, setKeyword] = useState(search ?? "");
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -82,42 +55,66 @@ export default function View() {
         <Card>
 
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl">
-              {filename}
-              <span className="ml-3 text-sm text-muted-foreground">
-                ({filteredRows.length} rows)
-              </span>
-            </CardTitle>
 
-            <Input
-              placeholder="Search ..."
-              className="w-[250px]"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </CardHeader>
+  <CardTitle className="text-xl">
+    {filename}
+
+    <span className="ml-3 text-sm text-muted-foreground">
+      ({totalRows.toLocaleString()} rows)
+    </span>
+  </CardTitle>
+
+  <Input
+    className="w-[300px]"
+    placeholder="Search..."
+    value={keyword}
+    onChange={(e) => setKeyword(e.target.value)}
+    onKeyDown={(e) => {
+      if (e.key === "Enter") {
+        router.get(
+          window.location.pathname,
+          {
+            page: 1,
+            search: keyword,
+          },
+          {
+            preserveScroll: true,
+          }
+        );
+      }
+    }}
+  />
+
+</CardHeader>
 
           <CardContent>
 
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-auto">
 
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {headers.map((h, idx) => (
-                      <TableHead key={idx} className="whitespace-nowrap">
-                        {h}
+                    {headers.map((header, index) => (
+                      <TableHead
+                        key={index}
+                        className="whitespace-nowrap"
+                      >
+                        {header}
                       </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
 
                 <TableBody>
-                  {paginatedRows.length > 0 ? (
-                    paginatedRows.map((row, i) => (
-                      <TableRow key={i}>
-                        {row.map((cell, j) => (
-                          <TableCell key={j} className="whitespace-nowrap">
+
+                  {rows.length > 0 ? (
+                    rows.map((row, rowIndex) => (
+                      <TableRow key={rowIndex}>
+                        {row.map((cell, cellIndex) => (
+                          <TableCell
+                            key={cellIndex}
+                            className="whitespace-nowrap"
+                          >
                             {cell || "-"}
                           </TableCell>
                         ))}
@@ -129,45 +126,73 @@ export default function View() {
                         colSpan={headers.length}
                         className="text-center"
                       >
-                        No results found
+                        No data found
                       </TableCell>
                     </TableRow>
                   )}
-                </TableBody>
 
+                </TableBody>
               </Table>
 
             </div>
 
-            {/* pagination */}
+            <div className="flex items-center justify-between mt-4">
 
-            <div className="flex justify-end items-center mt-4 gap-3">
+              <div className="text-sm text-muted-foreground">
+                Showing{" "}
+                {((page - 1) * 200) + 1}
+                {" - "}
+                {Math.min(page * 200, totalRows)}
+                {" of "}
+                {totalRows.toLocaleString()}
+              </div>
 
-              <Button
-                size="sm"
-                className="text-white bg-green-500 hover:bg-green-600"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </Button>
+              <div className="flex items-center gap-3">
 
-              <span>
-                Page {page} of {totalPages}
-              </span>
+                <Button
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() =>
+                    router.get(
+                      window.location.pathname,
+                      { page: page - 1, search: keyword, },
+                      {
+                        preserveState: true,
+                        preserveScroll: true,
+                      }
+                    )
+                  }
+                >
+                  Previous
+                </Button>
 
-              <Button
-                size="sm"
-                className="text-white bg-green-500 hover:bg-green-600"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </Button>
+                <span className="text-sm">
+                  Page {page} of {totalPages}
+                </span>
+
+                <Button
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() =>
+                    router.get(
+                      window.location.pathname,
+                      { page: page + 1, search: keyword, },
+                      {
+                        preserveState: true,
+                        preserveScroll: true,
+                      }
+                    )
+                  }
+                >
+                  Next
+                </Button>
+
+              </div>
 
             </div>
 
           </CardContent>
+
         </Card>
       </div>
     </AppLayout>
