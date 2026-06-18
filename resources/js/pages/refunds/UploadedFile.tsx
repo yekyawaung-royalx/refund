@@ -86,7 +86,7 @@ export interface PageProps extends InertiaPageProps {
 }
 
 export default function UploadedFile() {
-  const { files } = usePage<PageProps>().props;
+  const { files, auth } = usePage<PageProps>().props as any;
   const [search, setSearch] = React.useState("");
   const [selectedError, setSelectedError] = React.useState<string | null>(null);
 
@@ -332,6 +332,7 @@ export default function UploadedFile() {
 
 
                       {/* Delete Button */}
+                      {auth?.user?.role === 'admin' && (
                       <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
@@ -339,7 +340,7 @@ export default function UploadedFile() {
                         className="text-white bg-red-500 hover:bg-red-600 cursor-pointer flex items-center gap-1"
                         onClick={() => confirmDelete(item.id)}
                       >
-                        <Trash className="h-4 w-4" />
+                        <Trash className="h-4 w-4" /> 
                       </Button>
       </TooltipTrigger>
 
@@ -348,6 +349,7 @@ export default function UploadedFile() {
       </TooltipContent>
     </Tooltip>
   </TooltipProvider>
+                      )}
                       
                     </TableCell>
                     </TableRow>

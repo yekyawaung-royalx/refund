@@ -19,7 +19,7 @@ class LogController extends Controller
             ],
             [
                 'title' => 'Import Worker Log',
-                'path' => 'logs/default-worker.log',
+                'path' => 'logs/import-worker.log',
             ],
             [
                 'title' => 'Worker',
