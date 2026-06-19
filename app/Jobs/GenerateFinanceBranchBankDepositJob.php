@@ -99,60 +99,86 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 
                 foreach ($results as $row) {
                     $journalValue   = $isFirstRow ? $journalCode : null;
-                    $accountingDate  = $isFirstRow ? $this->accountingDate : null;
+                    $accountingDate = $isFirstRow ? $this->accountingDate : null;
                     $codPayable     = $row->cod_payable ?? 0;
 
-                    $insertData[] = [
-                        'journal' => $journalValue,
-                        'accounting_date' => $accountingDate,
-                        'ref' => null,
-                        'analytic' => $row->reference,
-                        'account' => '506030',
-                        'label' => 'COD Express Income Amount',
-                        'operation_unit' => 'OPR',
-                        'debit' => 0,
-                        'credit' => $row->cod_express_income ?? 0,
-                        //'category' => $categoryName,
-                    ];
-                    $insertData[] = [
-                        'journal' => null,
-                        'accounting_date' => null,
-                        'ref' => null,
-                        'analytic' => $row->reference,
-                        'account' => '506032',
-                        'label' => 'COD Income Amount',
-                        'operation_unit' => 'OPR',
-                        'debit' => 0,
-                        'credit' => $row->cod_income ?? 0,
-                        //'category' => $categoryName,
-                    ];
-                    $insertData[] = [
-                        'journal' => null,
-                        'accounting_date' => null,
-                        'ref' => null,
-                        'analytic' => $row->reference,
-                        'account' => $codPayable >= 0 ? '355003' : '272750', // 355003 for +, 272750 for -
-                        'label' => 'COD Payable Amount',
-                        'operation_unit' => 'OPR',
-                        'debit' => $codPayable < 0 ? abs($codPayable) : 0, // Amount -
-                        'credit' => $codPayable >= 0 ? $codPayable : 0, // Amount +
-                        //'category' => $categoryName,
-                    ];
-                    $insertData[] = [
-                        'journal' => null,
-                        'accounting_date' => null,
-                        'ref' => null,
-                        'analytic' => $row->reference,
-                        'account' => $row->journal,
-                        'label' => 'COD Total',
-                        'operation_unit' => 'OPR',
-                        'debit' => $row->cod_total ?? 0,
-                        'credit' => 0,
-                        //'category' => $categoryName,
-                    ];
+                    // collect valid rows first
+                    $rows = [];
+
+                    //COD Express Income Amount
+                    if ((float) $row->cod_express_income != 0) {
+                        $rows[] = [
+                            'journal'           => null,
+                            'accounting_date'   => null,
+                            'ref'               => null,
+                            'analytic'          => $row->reference,
+                            'account'           => '506030',
+                            'label'             => 'COD Express Income Amount',
+                            'operation_unit'    => 'OPR',
+                            'debit'             => 0,
+                            'credit'            => $row->cod_express_income ?? 0,
+                            //'category'        => $categoryName,
+                        ];
+                    }
+
+                    //COD Income Amount
+                    if ((float) $row->cod_income != 0) {
+                        $rows[] = [
+                            'journal'           => null,
+                            'accounting_date'   => null,
+                            'ref'               => null,
+                            'analytic'          => $row->reference,
+                            'account'           => '506032',
+                            'label'             => 'COD Income Amount',
+                            'operation_unit'    => 'OPR',
+                            'debit'             => 0,
+                            'credit'            => $row->cod_income ?? 0,
+                            //'category'        => $categoryName,
+                        ];
+                    }
+
+                    //COD Payable Amount
+                    if ((float) $codPayable != 0) {
+                        $rows[] = [
+                            'journal'           => null,
+                            'accounting_date'   => null,
+                            'ref'               => null,
+                            'analytic'          => $row->reference,
+                            'account'           => $codPayable >= 0 ? '355003' : '272750',
+                            'label'             => 'COD Payable Amount',
+                            'operation_unit'    => 'OPR',
+                            'debit'             => $codPayable < 0 ? abs($codPayable) : 0,
+                            'credit'            => $codPayable >= 0 ? $codPayable : 0,
+                            //'category'        => $categoryName,
+                        ];
+                    }
+
+                    //COD Total
+                    if ((float) $row->cod_total != 0) {
+                        $rows[] = [
+                            'journal'           => null,
+                            'accounting_date'   => null,
+                            'ref'               => null,
+                            'analytic'          => $row->reference,
+                            'account'           => $row->journal,
+                            'label'             => 'COD Total',
+                            'operation_unit'    => 'OPR',
+                            'debit'             => $row->cod_total ?? 0,
+                            'credit'            => 0,
+                            //'category'        => $categoryName,
+                        ];
+                    }
+
+                    // first valid row gets journal & accounting date
+                    if (!empty($rows)) {
+                        $rows[0]['journal'] = $journalValue;
+                        $rows[0]['accounting_date'] = $accountingDate;
+
+                        $insertData = array_merge($insertData, $rows);
+                    }
 
                     // next rows no journal
-                    $isFirstRow = false; 
+                    $isFirstRow = false;
                 }
             }
 
