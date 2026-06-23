@@ -94,12 +94,9 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     )
                     ->get();
 
-                // Category value insert at first row
-                $isFirstRow = true;
-
                 foreach ($results as $row) {
-                    $journalValue   = $isFirstRow ? $journalCode : null;
-                    $accountingDate = $isFirstRow ? $this->accountingDate : null;
+                    $journalValue   = $journalCode;
+                    $accountingDate = $this->accountingDate;
                     $codPayable     = $row->cod_payable ?? 0;
 
                     // collect valid rows first
@@ -108,15 +105,15 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     //COD Express Income Amount
                     if ((float) $row->cod_express_income != 0) {
                         $rows[] = [
-                            'journal'           => null,
-                            'accounting_date'   => null,
-                            'ref'               => null,
-                            'analytic'          => $row->reference,
                             'account'           => '506030',
-                            'label'             => 'COD Express Income Amount',
-                            'operation_unit'    => 'OPR',
+                            'partner'           => null,
+                            'analytic'          => $row->reference,
+                            'date'              => $accountingDate,
+                            'due_date'          => $accountingDate,
                             'debit'             => 0,
                             'credit'            => $row->cod_express_income ?? 0,
+                            'operation_unit'    => 'OPR',
+                            'label'             => $accountingDate.' '.$journalValue.' '.$row->reference.' COD Express Income Amount',
                             //'category'        => $categoryName,
                         ];
                     }
@@ -124,15 +121,15 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     //COD Income Amount
                     if ((float) $row->cod_income != 0) {
                         $rows[] = [
-                            'journal'           => null,
-                            'accounting_date'   => null,
-                            'ref'               => null,
-                            'analytic'          => $row->reference,
                             'account'           => '506032',
-                            'label'             => 'COD Income Amount',
-                            'operation_unit'    => 'OPR',
+                            'partner'           => null,
+                            'analytic'          => $row->reference,
+                            'date'              => $accountingDate,
+                            'due_date'          => $accountingDate,
                             'debit'             => 0,
                             'credit'            => $row->cod_income ?? 0,
+                            'operation_unit'    => 'OPR',
+                            'label'             => $accountingDate.' '.$journalValue.' '.$row->reference.' COD Income Amount',
                             //'category'        => $categoryName,
                         ];
                     }
@@ -140,15 +137,15 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     //COD Payable Amount
                     if ((float) $codPayable != 0) {
                         $rows[] = [
-                            'journal'           => null,
-                            'accounting_date'   => null,
-                            'ref'               => null,
-                            'analytic'          => $row->reference,
                             'account'           => $codPayable >= 0 ? '355003' : '272750',
-                            'label'             => 'COD Payable Amount',
-                            'operation_unit'    => 'OPR',
+                            'partner'           => null,
+                            'analytic'          => $row->reference,
+                            'date'              => $accountingDate,
+                            'due_date'          => $accountingDate,
                             'debit'             => $codPayable < 0 ? abs($codPayable) : 0,
                             'credit'            => $codPayable >= 0 ? $codPayable : 0,
+                            'operation_unit'    => 'OPR',
+                            'label'             => $accountingDate.' '.$journalValue.' '.$row->reference.' COD Payable Amount',
                             //'category'        => $categoryName,
                         ];
                     }
@@ -156,29 +153,18 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                     //COD Total
                     if ((float) $row->cod_total != 0) {
                         $rows[] = [
-                            'journal'           => null,
-                            'accounting_date'   => null,
-                            'ref'               => null,
-                            'analytic'          => $row->reference,
                             'account'           => $row->journal,
-                            'label'             => 'COD Total',
-                            'operation_unit'    => 'OPR',
+                            'partner'           => null,
+                            'analytic'          => $row->reference,
+                            'date'              => $accountingDate,
+                            'due_date'          => $accountingDate,
                             'debit'             => $row->cod_total ?? 0,
                             'credit'            => 0,
+                            'operation_unit'    => 'OPR',
+                            'label'             => $accountingDate.' '.$journalValue.' '.$row->reference.' COD Total',
                             //'category'        => $categoryName,
                         ];
                     }
-
-                    // first valid row gets journal & accounting date
-                    if (!empty($rows)) {
-                        $rows[0]['journal'] = $journalValue;
-                        $rows[0]['accounting_date'] = $accountingDate;
-
-                        $insertData = array_merge($insertData, $rows);
-                    }
-
-                    // next rows no journal
-                    $isFirstRow = false;
                 }
             }
 
@@ -212,29 +198,29 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             $handle = fopen($filePath, 'w');
 
             fputcsv($handle, [
-                'journal',
-                'accounting_date',
-                'ref',
-                'analytic',
-                'account',
-                'label',
-                'operation_unit',
-                'debit',
-                'credit',
+                'Account',
+                'Partner',
+                'Analytic Account',
+                'Date',
+                'Due Date',
+                'Debit',
+                'Credit',
+                'Operation Unit',
+                'Label',
                 //'category',
             ]);
 
             foreach ($insertData as $row) {
                 fputcsv($handle, [
-                    $row['journal'],
-                    $row['accounting_date'],
-                    $row['ref'],
-                    $row['analytic'],
                     $row['account'],
-                    $row['label'],
-                    $row['operation_unit'],
+                    $row['partner'],
+                    $row['analytic'],
+                    $row['date'],
+                    $row['due_date'],
                     $row['debit'],
                     $row['credit'],
+                    $row['operation_unit'],
+                    $row['label'],
                     //$row['category'],
                 ]);
             }
@@ -276,11 +262,11 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 
                 $uploadIds = $query->pluck('u.id')->toArray();
 
-                if (!empty($uploadIds)) {
-                    DB::table('upload_data')
-                        ->whereIn('id', $uploadIds)
-                        ->update(['branch_bank_deposit_export' => $financeExportId]);
-                }
+                // if (!empty($uploadIds)) {
+                //     DB::table('upload_data')
+                //         ->whereIn('id', $uploadIds)
+                //         ->update(['branch_bank_deposit_export' => $financeExportId]);
+                // }
             }
 
             // saved user action logs
