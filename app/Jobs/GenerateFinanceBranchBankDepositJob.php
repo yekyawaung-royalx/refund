@@ -165,6 +165,8 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                             //'category'        => $categoryName,
                         ];
                     }
+
+                    $insertData = array_merge($insertData, $rows);
                 }
             }
 
