@@ -97,7 +97,7 @@ export default function DailyRefundSummary({
                                 </th>
 
                                 <th className="text-right p-3">
-                                    Refund Amount
+                                    Refunded Amount
                                 </th>
 
                                 <th className="text-right p-3">
@@ -105,7 +105,7 @@ export default function DailyRefundSummary({
                                 </th>
 
                                 <th className="text-right p-3">
-                                    Refund Waybills
+                                    Refunded Waybills
                                 </th>
                             </tr>
                         </thead>
@@ -131,13 +131,13 @@ export default function DailyRefundSummary({
                                             <RefreshCcw
                                                 size={16}
                                                 className={`
-            text-green-500
-            ${
-                loadingDate === item.date
-                ? "animate-spin"
-                : ""
-            }
-        `}
+                                                    text-green-500
+                                                    ${
+                                                        loadingDate === item.date
+                                                        ? "animate-spin"
+                                                        : ""
+                                                    }
+                                                `}
                                             />
                                         </button>
                                     </div>
