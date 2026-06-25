@@ -14,92 +14,73 @@ use Carbon\Carbon;
 class DailyRefundSummaryJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-    
-    protected ?int $fileId;
-    protected ?int $totalRows;
-    protected ?string $paymentDate;
-    protected ?float $totalAmount;
 
-    public function __construct(?int $fileId = null, ?int $totalRows = null, ?string $paymentDate = null, ?float $totalAmount = null)
+    protected string $accountingDate;
+
+    public function __construct(string $accountingDate)
     {
-        $this->fileId = $fileId;
-        $this->totalRows = $totalRows;
-        $this->paymentDate = $paymentDate;
-        $this->totalAmount = $totalAmount;
+        $this->accountingDate = $accountingDate;
     }
 
     public function handle()
     {
         try {
 
-            $today = Carbon::today()->toDateString();
+            $date = Carbon::parse($this->accountingDate)->toDateString();
 
-            // -----------------------------
-            // Get or create today's summary
-            // -----------------------------
-            $summary = DB::table('refund_summaries')
-                ->whereDate('created_at', $today)
+            // -----------------------------------
+            // 1. Aggregate upload_data by date
+            // -----------------------------------
+            $stats = DB::table('upload_data')
+                ->whereDate('accounting_date', $date)
+                ->selectRaw("
+                    SUM(CASE WHEN refund = 0 THEN cod_payable_amount ELSE 0 END) as to_refund_amount,
+                    SUM(CASE WHEN refund = 1 THEN cod_payable_amount ELSE 0 END) as refund_amount,
+                    SUM(CASE WHEN refund = 0 THEN 1 ELSE 0 END) as to_refund_rows,
+                    SUM(CASE WHEN refund = 1 THEN 1 ELSE 0 END) as refund_rows
+                ")
                 ->first();
 
-            if (!$summary) {
-                $summaryId = DB::table('refund_summaries')->insertGetId([
-                    'refund_amount' => 0,
-                    'to_refund_amount' => 0,
-                    'to_refund_rows' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+            $toRefundAmount = $stats->to_refund_amount ?? 0;
+            $refundAmount   = $stats->refund_amount ?? 0;
+            $toRefundRows   = $stats->to_refund_rows ?? 0;
+            $refundRows     = $stats->refund_rows ?? 0;
+
+            // -----------------------------------
+            // 2. Upsert into refund_summaries
+            // -----------------------------------
+            $existing = DB::table('refund_summaries')
+                ->whereDate('date', $date)
+                ->first();
+
+            if ($existing) {
+                DB::table('refund_summaries')
+                    ->where('id', $existing->id)
+                    ->update([
+                        'title'             => $date . '-daily-summary',
+                        'date'              => $date,
+                        'to_refund_amount'  => $toRefundAmount,
+                        'refund_amount'     => $refundAmount,
+                        'to_refund_rows'    => $toRefundRows,
+                        'refund_rows'       => $refundRows,
+                        'updated_at'        => now(),
+                    ]);
+
+                Log::info("Refund summary updated for date: {$date}");
+
+            } else {
+                DB::table('refund_summaries')->insert([
+                    'title'             => $date . '-daily-summary',
+                    'date'              => $date,
+                    'to_refund_amount'  => $toRefundAmount,
+                    'refund_amount'     => $refundAmount,
+                    'to_refund_rows'    => $toRefundRows,
+                    'refund_rows'       => $refundRows,
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
                 ]);
 
-                $summary = DB::table('refund_summaries')->where('id', $summaryId)->first();
-            }
-
-            // -----------------------------
-            // CASE 1: fileId flow
-            // -----------------------------
-            if ($this->fileId && is_null($this->paymentDate)) {
-
-                $sumAmount = DB::table('upload_data')
-                    ->where('export_id', $this->fileId)
-                    ->sum('cod_payable_amount');
-
-                DB::table('refund_summaries')
-                    ->where('id', $summary->id)
-                    ->update([
-                        'to_refund_amount' => DB::raw("to_refund_amount + {$sumAmount}"),
-                        'to_refund_rows'   => DB::raw("to_refund_rows + {$this->totalRows}"),
-                        'updated_at'       => now(),
-                    ]);
-
-                Log::info("Refund summary updated (fileId): {$this->fileId}");
-
-                return;
-            }
-
-            // -----------------------------
-            // CASE 2: payment_date flow
-            // -----------------------------
-            if (!is_null($this->paymentDate)) {
-
-                // prevent duplicate
-                if (!is_null($summary->last_upload_id) && $summary->last_upload_id == $this->fileId) {
-                    Log::warning("Duplicate job skipped", [
-                        'upload_id' => $this->fileId
-                    ]);
-                    return;
-                }
-
-                $sumAmount = $this->totalAmount ?? 0;
-
-                DB::table('refund_summaries')
-                    ->where('id', $summary->id)
-                    ->update([
-                        'refund_amount' => DB::raw("refund_amount + {$sumAmount}"),
-                        'refund_rows' => 100,
-                        'last_upload_id' => $this->fileId,
-                        'updated_at' => now(),
-                    ]);
-
-                return;
+                Log::info("Refund summary created for date: {$date}");
             }
 
         } catch (\Throwable $e) {

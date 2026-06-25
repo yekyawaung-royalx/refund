@@ -430,15 +430,16 @@ class RefundController extends Controller
 
     public function recent_refund_summaries()
     {
-        $date = '';
         $recent_refund_summaries = DB::table('refund_summaries')
-            ->orderBy('id', 'desc')
+            ->orderBy('date', 'desc')
             ->limit(10)
             ->get();
 
-        DailyRefundSummaryJob::dispatch($date);
-
         return response()->json($recent_refund_summaries);
+    }
+
+    public function generate_recent_refund_summaries($date){
+        DailyRefundSummaryJob::dispatch($date);
     }
 
     public function search(Request $request)
@@ -547,5 +548,66 @@ class RefundController extends Controller
         $response->headers->set('Content-Disposition', "attachment; filename={$filename}");
 
         return $response;
+    }
+
+    public function updated_recent_refund_summaries(Request $request)
+    {
+        $request->validate([
+            'accounting_date' => ['required', 'date'],
+        ]);
+
+        try {
+
+            $date = Carbon::parse($request->accounting_date)->toDateString();
+
+            $stats = DB::table('upload_data')
+                ->whereDate('accounting_date', $date)
+                ->selectRaw("
+                    SUM(CASE WHEN refund = 0 THEN cod_payable_amount ELSE 0 END) as to_refund_amount,
+                    SUM(CASE WHEN refund = 1 THEN cod_payable_amount ELSE 0 END) as refund_amount,
+                    SUM(CASE WHEN refund = 0 THEN 1 ELSE 0 END) as to_refund_rows,
+                    SUM(CASE WHEN refund = 1 THEN 1 ELSE 0 END) as refund_rows
+                ")
+                ->first();
+
+            DB::table('refund_summaries')->updateOrInsert(
+                [
+                    'date' => $date,
+                ],
+                [
+                    'title'             => "{$date}-daily-summary",
+                    'to_refund_amount'  => $stats->to_refund_amount ?? 0,
+                    'refund_amount'     => $stats->refund_amount ?? 0,
+                    'to_refund_rows'    => $stats->to_refund_rows ?? 0,
+                    'refund_rows'       => $stats->refund_rows ?? 0,
+                    'updated_at'        => now(),
+                    'created_at'        => now(),
+                ]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Refund summary generated successfully.',
+                'data' => [
+                    'date' => $date,
+                    'to_refund_amount' => (float) ($stats->to_refund_amount ?? 0),
+                    'refund_amount' => (float) ($stats->refund_amount ?? 0),
+                    'to_refund_rows' => (int) ($stats->to_refund_rows ?? 0),
+                    'refund_rows' => (int) ($stats->refund_rows ?? 0),
+                ]
+            ]);
+
+        } catch (\Throwable $e) {
+
+            Log::error('DailyRefundSummary Error', [
+                'date' => $request->accounting_date,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

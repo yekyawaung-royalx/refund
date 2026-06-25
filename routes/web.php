@@ -11,6 +11,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\LogController;
+use App\Http\Controllers\ArchiveRefundController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -95,7 +96,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/recent-exported-files', [UploadController::class, 'recent_exported_files']);
     Route::get('/recent-uploaded-data', [UploadController::class, 'recent_uploaded_data']);
     Route::get('/recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
-    
+    Route::post('/updated-recent-refund-summaries', [RefundController::class, 'updated_recent_refund_summaries']);
+
     /* Finance Report Routes */
     Route::get('/finance-report/branches-deposit', [ReportingController::class, 'finance_report_branches_deposit']);
     Route::get('/finance-report/branches-deposit/export', [ReportingController::class, 'branches_deposit_export']);
@@ -122,6 +124,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/logs', [LogController::class, 'logs']);
     Route::get('/logs/view', [LogController::class, 'view'])->name('logs.view');
+
+    //Manual Generate
+    Route::get('/generate/recent-refund-summaries/{date}', [RefundController::class, 'generate_recent_refund_summaries']);
+
+    //Archive Data
+    Route::get('/archive/{id}', [ArchiveRefundController::class, 'archive']);
 });
 
 require __DIR__.'/settings.php';
