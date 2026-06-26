@@ -33,6 +33,12 @@ class DailyRefundSummaryJob implements ShouldQueue
             // -----------------------------------
             $stats = DB::table('upload_data')
                 ->whereDate('accounting_date', $date)
+                ->where('payment_by', 'Sender Pay')
+                ->where('payment_type', 'Postpaid')
+                ->whereIn('service_type', [
+                    'express',
+                    'same_day_delivery'
+                ])
                 ->selectRaw("
                     SUM(CASE WHEN refund = 0 THEN cod_payable_amount ELSE 0 END) as to_refund_amount,
                     SUM(CASE WHEN refund = 1 THEN cod_payable_amount ELSE 0 END) as refund_amount,
