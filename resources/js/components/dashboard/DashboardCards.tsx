@@ -59,59 +59,47 @@ export default function DashboardCards({
     return (
         <div className="grid auto-rows-min gap-4 md:grid-cols-3">
             {cards.map(card=>(
-                <Card
-                    key={card.title}
-                    className="
-                    relative
-                    overflow-hidden
-                    rounded-xl
-                    shadow-lg
-                    hover:scale-105
-                    transition-transform
-                    duration-300
-                    "
-                >
-                    <div
-                        className={`
-                            ${card.bg}
-                            absolute
-                            inset-0
-                            opacity-80
-                        `}
-                    />
-                    <CardContent
-                        className="
-                        relative
-                        z-10
-                        text-white
-                        space-y-4
-                        "
-                    >
+                <Card key={card.title} className="relative overflow-hidden rounded-xl shadow-lg hover:scale-105 transition-transform duration-300">
+                    <div className={` ${card.bg} absolute inset-0 opacity-80`} />
+                    <CardContent className="relative z-10 text-white space-y-4">
                         <div className="flex items-center gap-2">
                             {card.icon}
                             <CardTitle className="flex flex-1 items-center justify-between text-white">
                                 <span>{card.title}</span>
-                                <Badge
-                                    className={`${card.badge} rounded-full text-xs font-medium`}
-                                >
+                                <Badge className={`${card.badge} rounded-full text-xs font-medium`}>
                                     {currentMonth}
                                 </Badge>
                             </CardTitle>
                         </div>
                         <div className="flex flex-col gap-1 mt-2">
-                            <div
-                                className="
-                                text-3xl
-                                md:text-4xl
-                                font-bold
-                                "
-                            >
-                                {numberFormat.format(card.month)}
+                            {/* Row 1 - 2 cols */}
+                            <div className="grid grid-cols-2 items-center gap-4">
+                                {/* Col 1 */}
+                                <div className="text-3xl md:text-4xl font-bold">
+                                    {numberFormat.format(card.month)}
+                                </div>
+
+                                {/* Col 2 */}
                                 {card.export && (
-                                    <small className="ml-2 text-xl">(<span className="text-slate-200 text-lg">Exported: </span>{numberFormat.format(card.export)})</small>
+                                    <div className="flex items-center justify-between rounded-lg bg-white/10 border border-white/20 px-1.5 py-0.5">
+                                        <span className="text-sm text-slate-300 font-medium">
+                                            To Export:
+                                        </span>
+
+                                        <span className="text-lg font-bold text-white">
+                                            {numberFormat.format(card.export)}
+                                        </span>
+
+                                        {/* Pulse */}
+                                        <span className="relative flex h-3 w-3">
+                                            <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping"/>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"/>
+                                        </span>
+                                    </div>
                                 )}
                             </div>
 
+                            {/* Bottom */}
                             <div className="text-sm mt-2">
                                 <span className="font-semibold">
                                     All Records:
