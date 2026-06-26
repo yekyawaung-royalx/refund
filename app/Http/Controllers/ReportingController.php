@@ -219,8 +219,21 @@ class ReportingController extends Controller
 
             $headers = array_values(array_shift($data));
             foreach ($data as $row) {
+                $row = array_values($row);
+                $row = array_map(function ($value) {
+                    if (is_numeric($value)) {
+                        return number_format(
+                            (float) $value,
+                            2,
+                            '.',
+                            ''
+                        );
+                    }
+                    return $value;
 
-                $rows[] = array_values($row);
+                }, $row);
+
+                $rows[] = $row;
             }
         } else {
             abort(400, 'Unsupported file format');
