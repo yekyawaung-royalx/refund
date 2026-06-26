@@ -80,6 +80,16 @@ class RefundController extends Controller
             ->where('refund', 0)
             ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
             ->count();
+        $refund0ThisMonthExport = DB::table('upload_data')
+            ->where('refund', 0)
+            ->where('payment_by', 'Sender Pay')
+            ->where('payment_type', 'Postpaid')
+            ->whereIn('service_type', [
+                'express',
+                'same_day_delivery',
+            ])
+            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->count();
 
         // Refund = 1
         $refund1Total = DB::table('upload_data')->where('refund', 1)->count();
@@ -100,6 +110,7 @@ class RefundController extends Controller
                 'refund0' => [
                     'all_time' => $refund0Total,
                     'this_month' => $refund0ThisMonth,
+                    'this_month_export' => $refund0ThisMonthExport,
                 ],
                 'refund1' => [
                     'all_time' => $refund1Total,

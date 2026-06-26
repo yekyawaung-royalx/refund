@@ -31,7 +31,7 @@ export default function RecentRefunds({
                     <TableHeader>
                         <TableRow>
                             <TableHead>
-                                Date
+                                Outbound Date
                             </TableHead>
 
                             <TableHead>
@@ -64,7 +64,7 @@ export default function RecentRefunds({
                         {refunds.map((row:any, index:number)=>(
                             <TableRow key={index}>
                                 <TableCell className="text-sm">
-                                    {row.date}
+                                    {row.outbound_date}
                                 </TableCell>
 
                                 <TableCell className="font-medium">
