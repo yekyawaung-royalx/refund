@@ -11,6 +11,7 @@ use App\Jobs\GenerateFinanceCodRefundJob;
 use App\Jobs\GenerateFinanceSenderReceiverJob;
 use App\Models\FinanceExport;
 use Auth;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ReportingController extends Controller
 {
@@ -161,7 +162,81 @@ class ReportingController extends Controller
         ]);
     }
 
-    
+    public function view_finance_exported_branches_deposit_files($id)
+    {
+        $export = FinanceExport::findOrFail($id);
+        $date = Carbon::parse($export->created_at)->format('Y-m');
+        $filename = $export->filename;
+        $filePath = storage_path("app/private/finance-reports/{$date}/{$filename}");
+       
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File not found');
+        }
+
+
+        $rows = [];
+        $headers = [];
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        /*
+        |--------------------------------------------------------------------------
+        | CSV
+        |--------------------------------------------------------------------------
+        */
+        if ($extension === 'csv') {
+            $file = new \SplFileObject($filePath);
+            $file->setFlags(
+                \SplFileObject::READ_CSV |
+                \SplFileObject::SKIP_EMPTY
+            );
+            $file->setCsvControl(",");
+            foreach ($file as $row) {
+
+                if ($row === [null]) {
+                    continue;
+                }
+
+                $rows[] = $row;
+            }
+            $headers = array_shift($rows);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | XLSX
+        |--------------------------------------------------------------------------
+        */
+        elseif ($extension === 'xlsx') {
+            $spreadsheet = IOFactory::load($filePath);
+            $sheet = $spreadsheet->getActiveSheet();
+            $data = $sheet->toArray(
+                null,
+                true,
+                true,
+                true
+            );
+
+            $headers = array_values(array_shift($data));
+            foreach ($data as $row) {
+
+                $rows[] = array_values($row);
+            }
+        } else {
+            abort(400, 'Unsupported file format');
+        }
+
+        $rows = array_filter($rows, function ($row) {
+            return is_array($row);
+        });
+
+        return Inertia::render('reporting/ViewExportedFile', [
+            'filename' => $filename,
+            'headers'  => $headers,
+            'rows'     => array_values($rows),
+        ]);
+    }
+
     public function finance_report_branches_deposit(Request $request)
     {
         $branches = DB::table('analytics')->where('journal','!=','')->get();
@@ -284,48 +359,7 @@ class ReportingController extends Controller
         return response()->json($files);
     }
 
-    public function view_finance_exported_branches_deposit_files($id)
-    {
-        $export = FinanceExport::findOrFail($id);
-
-        // created_at → 2026-03
-        $date = Carbon::parse($export->created_at)->format('Y-m');
-
-        $filename = $export->filename;
-
-        $filePath = storage_path("app/private/finance-reports/{$date}/{$filename}");
-
-        if (!file_exists($filePath)) {
-            abort(404, 'File not found');
-        }
-
-        $rows = [];
-
-        $file = new \SplFileObject($filePath);
-        $file->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY);
-        $file->setCsvControl(",");
-
-        foreach ($file as $row) {
-
-            if ($row === [null]) {
-                continue;
-            }
-
-            $rows[] = $row;
-        }
-
-        $headers = array_shift($rows);
-        
-        $rows = array_filter($rows, function ($row) {
-            return is_array($row);
-        });
-        
-        return Inertia::render('reporting/ViewExportedFile', [
-            'filename' => $filename,
-            'headers' => $headers,
-            'rows' => $rows
-        ]);
-    }
+    
 
     public function download_exported_branches_deposit_file($id)
     {
