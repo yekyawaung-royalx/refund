@@ -9,6 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 {
@@ -186,20 +188,27 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             }
 
             // -----------------------------
-            // CSV Export
+            // XLSX Export
             // -----------------------------
             $folder = now()->format('Y-m');
             $timestamp = now()->format('Ymd_His');
+
             $fileName = "branches-depoit-{$this->accountingDate}-{$timestamp}.xlsx";
+
             $relativePath = "private/finance-reports/{$folder}/{$fileName}";
 
             $directory = storage_path("app/private/finance-reports/{$folder}");
-            if (!is_dir($directory)) mkdir($directory, 0755, true);
 
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
             $filePath = "{$directory}/{$fileName}";
-            $handle = fopen($filePath, 'w');
 
-            fputcsv($handle, [
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Header
+            $headers = [
                 'Account',
                 'Partner',
                 'Analytic Account',
@@ -209,25 +218,47 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
                 'Credit',
                 'Operation Unit',
                 'Label',
-                //'category',
-            ]);
+            ];
+
+            $sheet->fromArray(
+                $headers,
+                null,
+                'A1'
+            );
+
+            // Data
+            $rowNumber = 2;
 
             foreach ($insertData as $row) {
-                fputcsv($handle, [
-                    $row['account'],
-                    $row['partner'],
-                    $row['analytic'],
-                    $row['date'],
-                    $row['due_date'],
-                    $row['debit'],
-                    $row['credit'],
-                    $row['operation_unit'],
-                    $row['label'],
-                    //$row['category'],
-                ]);
+
+                $sheet->fromArray(
+                    [
+                        $row['account'],
+                        $row['partner'],
+                        $row['analytic'],
+                        $row['date'],
+                        $row['due_date'],
+                        $row['debit'],
+                        $row['credit'],
+                        $row['operation_unit'],
+                        $row['label'],
+                    ],
+                    null,
+                    "A{$rowNumber}"
+                );
+
+                $rowNumber++;
             }
 
-            fclose($handle);
+            // auto size columns
+            foreach (range('A','I') as $column) {
+                $sheet->getColumnDimension($column)
+                    ->setAutoSize(true);
+            }
+            // Save XLSX
+            $writer = new Xlsx($spreadsheet);
+
+            $writer->save($filePath);
 
             // -----------------------------
             // Save export record & get id
