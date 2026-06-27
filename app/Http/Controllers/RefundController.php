@@ -443,8 +443,7 @@ class RefundController extends Controller
     {
         $recent_refund_summaries = DB::table('refund_summaries')
             ->orderBy('date', 'desc')
-            ->limit(10)
-            ->get();
+            ->paginate(10);
 
         return response()->json($recent_refund_summaries);
     }

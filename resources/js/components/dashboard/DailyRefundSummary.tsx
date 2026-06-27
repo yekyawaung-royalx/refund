@@ -1,14 +1,15 @@
 import React from "react";
 import { RefreshCcw } from "lucide-react";
+
 type Props = {
-    summaries: any[];
+    summaries: any;
     loading: boolean;
-    setSummaries: React.Dispatch<React.SetStateAction<any[]>>;
+    onPageChange: (page: number) => void;
 };
 export default function DailyRefundSummary({
     summaries,
     loading,
-    setSummaries,
+    onPageChange,
 }: Props) {
     const [loadingDate, setLoadingDate] = React.useState<string | null>(null);
     const handleRefresh = async (accountingDate: string) => {
@@ -17,7 +18,7 @@ export default function DailyRefundSummary({
             setLoadingDate(accountingDate);
             const startTime = Date.now();
             
-            const response = await fetch(
+            await fetch(
                 "/updated-recent-refund-summaries",
                 {
                     method: "POST",
@@ -37,19 +38,8 @@ export default function DailyRefundSummary({
                 }
             );
 
-            const result = await response.json();
-            if(result.success){
-                setSummaries((prev)=> 
-                    prev.map((row)=>
-                        row.date === accountingDate
-                        ? {
-                            ...row,
-                            ...result.data
-                          }
-                        : row
-                    )
-                );
-            }
+            //const result = await response.json();
+            
 
             // minimum spin time
             const elapsed = Date.now() - startTime;
@@ -83,7 +73,7 @@ export default function DailyRefundSummary({
                 </div>
             )}
 
-            {!loading && summaries.length > 0 && (
+            {!loading && summaries?.data?.length > 0 && (
                 <div className="rounded-md border">
                     <table className="w-full text-sm">
                         <thead className="bg-muted">
@@ -110,9 +100,9 @@ export default function DailyRefundSummary({
                             </tr>
                         </thead>
                         <tbody>
-                        {summaries.map((item,index)=>(
+                        {summaries.data.map((item,index)=>(
                             <tr
-                              key={index}
+                               key={item.id}
                               className="border-t hover:bg-muted/40"
                             >
                                 <td className="p-3">
@@ -171,10 +161,54 @@ export default function DailyRefundSummary({
                         ))}
                         </tbody>
                     </table>
+                    {summaries && summaries.last_page > 1 && (
+    <div className="flex items-center justify-between px-4 py-3 border-t">
+        <div className="text-sm text-gray-500">
+            Page {summaries.current_page} of {summaries.last_page}
+        </div>
+
+        <div className="flex gap-2">
+            <button
+                className="px-3 py-1 border rounded disabled:opacity-50"
+                disabled={summaries.current_page === 1}
+                onClick={() => onPageChange(summaries.current_page - 1)}
+            >
+                Previous
+            </button>
+
+            {Array.from(
+                { length: summaries.last_page },
+                (_, i) => i + 1
+            ).map((page) => (
+                <button
+                    key={page}
+                    onClick={() => onPageChange(page)}
+                    className={`px-3 py-1 border rounded ${
+                        page === summaries.current_page
+                            ? "bg-teal-600 text-white"
+                            : ""
+                    }`}
+                >
+                    {page}
+                </button>
+            ))}
+
+            <button
+                className="px-3 py-1 border rounded disabled:opacity-50"
+                disabled={
+                    summaries.current_page === summaries.last_page
+                }
+                onClick={() => onPageChange(summaries.current_page + 1)}
+            >
+                Next
+            </button>
+        </div>
+    </div>
+)}
                 </div>
             )}
 
-            {!loading && summaries.length === 0 && (
+            {!loading && summaries?.data?.length === 0 && (
                 <div className="p-6 text-muted-foreground">
                     No recent refund summaries
                 </div>

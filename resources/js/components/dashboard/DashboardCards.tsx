@@ -83,7 +83,7 @@ export default function DashboardCards({
                                 {card.export && (
                                     <div className="flex items-center justify-between rounded-lg bg-white/10 border border-white/20 px-1.5 py-0.5">
                                         <span className="text-sm text-slate-300 font-medium">
-                                            To Export:
+                                            To Refund:
                                         </span>
 
                                         <span className="text-lg font-bold text-white">

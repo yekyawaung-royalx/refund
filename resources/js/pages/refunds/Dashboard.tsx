@@ -19,9 +19,18 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
 ];
 
+type Pagination = {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    data: any[];
+};
+
 export default function Dashboard() {
     const { stats, execution_time_ms } = usePage().props as any;
-    const [summaries, setSummaries] = React.useState<any[]>([]);
+    //const [summaries, setSummaries] = React.useState<any[]>([]);
+    const [summaryPage, setSummaryPage] = React.useState<Pagination | null>(null);
     const [loading, setLoading] = React.useState(true); 
     const [tab, setTab] = React.useState("refund-summary");
 
@@ -36,19 +45,25 @@ export default function Dashboard() {
     const [refunds, setRefunds] = React.useState<any[]>([]);
     const [refundLoading, setRefundLoading] = React.useState(false);
     const [refundLoaded, setRefundLoaded] = React.useState(false);
-    const [rows, setRows] = React.useState<any[]>([]);
+    //const [rows, setRows] = React.useState<any[]>([]);
+
+    const loadSummaries = async (page = 1) => {
+        try {
+            setLoading(true);
+
+            const res = await fetch(`/recent-refund-summaries?page=${page}`);
+            const json = await res.json();
+
+            setSummaryPage(json);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+    }
+    };
 
     React.useEffect(() => {
-        fetch("/recent-refund-summaries")
-        .then((res) => res.json())
-        .then((data) => {
-            setSummaries(data);
-            setRows(data);
-            setLoading(false);
-        })
-        .catch(() => {
-            setLoading(false);
-        });
+        loadSummaries();
 
         if (tab === "uploaded" && !uploadedLoaded) {
         setUploadedLoading(true);
@@ -129,9 +144,10 @@ export default function Dashboard() {
                         {/* Daily Refund */}
                         <TabsContent value="refund-summary" className="mt-6">
                             <DailyRefundSummary
-                                summaries={summaries}
+                                summaries={summaryPage}
                                 loading={loading}
-                                setSummaries={setSummaries}
+                                //setSummaryPage={setSummaryPage}
+                                onPageChange={loadSummaries}
                             />
                         </TabsContent>
 
