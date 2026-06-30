@@ -37,7 +37,7 @@ class ProcessStagingRefundedJob implements ShouldQueue
                 ON u.waybill_no = s.waybill_no
             SET
                 s.status = 'failed',
-                s.reason = 'not_found',
+                s.reason = 'Waybill not found',
                 s.updated_at = NOW()
             WHERE
                 s.upload_id = ?
@@ -56,7 +56,7 @@ class ProcessStagingRefundedJob implements ShouldQueue
             AND u.accounting_date = s.accounting_date
             SET
                 s.status = 'failed',
-                s.reason = 'already_refunded',
+                s.reason = 'Already refunded',
                 s.updated_at = NOW()
             WHERE
                 s.upload_id = ?
@@ -75,7 +75,7 @@ class ProcessStagingRefundedJob implements ShouldQueue
             AND u.accounting_date = s.accounting_date
             SET
                 s.status = 'failed',
-                s.reason = 'accounting_date_not_match',
+                s.reason = 'Accounting date not match',
                 s.updated_at = NOW()
             WHERE
                 s.upload_id = ?
@@ -85,6 +85,22 @@ class ProcessStagingRefundedJob implements ShouldQueue
 
         /**
          * STEP 4
+         * AMOUNT DOES NOT MATCH
+         */
+        DB::update("
+            UPDATE staging_refunded
+            SET
+                status = 'failed',
+                reason = CONCAT('Amount must be ', refund_amount),
+                updated_at = NOW()
+            WHERE
+                upload_id = ?
+                AND status = 'pending'
+                AND ROUND(amount, 2) <> ROUND(refund_amount, 2)
+        ", [$this->uploadId]);
+
+        /**
+         * STEP 5
          * BULK REFUND UPDATE
          */
         DB::update("
@@ -108,7 +124,7 @@ class ProcessStagingRefundedJob implements ShouldQueue
         ]);
 
         /**
-         * STEP 5
+         * STEP 6
          * MARK PROCESSED
          */
         DB::table('staging_refunded')
@@ -120,7 +136,7 @@ class ProcessStagingRefundedJob implements ShouldQueue
             ]);
 
         /**
-         * STEP 6
+         * STEP 7
          * SUMMARY
          */
         $summary = DB::table('staging_refunded')
@@ -132,13 +148,13 @@ class ProcessStagingRefundedJob implements ShouldQueue
             ->first();
 
         /**
-         * STEP 7
+         * STEP 8
          * EXPORT FAILED FILE
          */
         $failedPath = $this->exportFailedFile();
 
         /**
-         * STEP 8
+         * STEP 9
          * FINAL UPDATE
          */
         DB::table('uploads')
@@ -156,7 +172,7 @@ class ProcessStagingRefundedJob implements ShouldQueue
             ]);
 
         /**
-         * STEP 9
+         * STEP 10
          * CLEANUP
          */
         Log::info('CLEANUP START');

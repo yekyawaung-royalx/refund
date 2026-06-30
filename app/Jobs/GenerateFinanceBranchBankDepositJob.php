@@ -295,11 +295,11 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
 
                 $uploadIds = $query->pluck('u.id')->toArray();
 
-                // if (!empty($uploadIds)) {
-                //     DB::table('upload_data')
-                //         ->whereIn('id', $uploadIds)
-                //         ->update(['branch_bank_deposit_export' => $financeExportId]);
-                // }
+                if (!empty($uploadIds)) {
+                    DB::table('upload_data')
+                        ->whereIn('id', $uploadIds)
+                        ->update(['branch_bank_deposit_export' => $financeExportId]);
+                }
             }
 
             // saved user action logs

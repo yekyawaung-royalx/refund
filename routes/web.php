@@ -89,8 +89,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/refunds/uploaded-files/{id}', [UploadController::class, 'destroy']);
     Route::get('/reporting/search', [ReportingController::class, 'search']);
     Route::post('/users/{user}/permissions', [UserController::class, 'update_permissions']);
-    Route::get('/analytics-accounts', [AnalyticsController::class, 'analytics_accounts']);
+    Route::get('/analytics-accounts', [AnalyticsController::class, 'analytics_accounts'])->name('analytics');
     Route::get('/analytics-accounts/create', [AnalyticsController::class, 'create_analytics_accounts']);
+    Route::put('/analytics-accounts/update', [AnalyticsController::class, 'update_analytics_accounts']);
     Route::get('/recent-activities', [UploadController::class, 'recent_activities']);
     Route::get('/recent-uploaded-files', [UploadController::class, 'recent_uploaded_files']);
     Route::get('/recent-exported-files', [UploadController::class, 'recent_exported_files']);

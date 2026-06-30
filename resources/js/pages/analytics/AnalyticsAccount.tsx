@@ -42,7 +42,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function AnalyticsAccount() {
-
+const { auth } = usePage().props as any;
   const page = usePage().props as any;
 
   const analytics = page.analytics ?? {
@@ -58,6 +58,15 @@ export default function AnalyticsAccount() {
 
   const [deleteId, setDeleteId] = React.useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+
+  const [editOpen, setEditOpen] = React.useState(false);
+
+const [editData, setEditData] = React.useState({
+  id: null,
+  account: "",
+  reference: "",
+  journal: "",
+});
 
   const filteredData = (analytics.data ?? []).filter((item: any) =>
     Object.values(item).some((value) =>
@@ -89,13 +98,47 @@ export default function AnalyticsAccount() {
     });
   };
 
+  const handleUpdate = () => {
+
+  router.put(
+    `/analytics-accounts/update`,
+    editData,
+    {
+      onSuccess: () => {
+
+        toast.success(
+          "Account updated successfully"
+        );
+
+        setEditOpen(false);
+
+      },
+
+      onError: () => {
+        toast.error(
+          "Update failed"
+        );
+      }
+    }
+  );
+
+};
+
   const handleView = (id: number) => {
     router.visit(`/analytics-accounts/${id}`);
   };
 
-  const handleEdit = (id: number) => {
-    router.visit(`/analytics-accounts/${id}/edit`);
-  };
+  const handleEdit = (item:any) => {
+
+  setEditData({
+    id: item.id,
+    account: item.account ?? "",
+    reference: item.reference ?? "",
+    journal: item.journal ?? "",
+  });
+
+  setEditOpen(true);
+};
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -182,14 +225,17 @@ export default function AnalyticsAccount() {
                           <EyeIcon className="h-4 w-4" />
                         </Button>
 
+
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => handleEdit(item.id)}
+                          onClick={() => handleEdit(item)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
 
+
+{auth?.user?.role === "admin" ? (
                         <Button
                           size="sm"
                           variant="destructive"
@@ -197,7 +243,7 @@ export default function AnalyticsAccount() {
                         >
                           <Trash className="h-4 w-4" />
                         </Button>
-
+):null}
                       </TableCell>
 
                     </TableRow>
@@ -287,6 +333,91 @@ export default function AnalyticsAccount() {
         </DialogContent>
 
       </Dialog>
+
+      {/* Edit Dialog */}
+
+<Dialog
+  open={editOpen}
+  onOpenChange={setEditOpen}
+>
+
+<DialogContent>
+
+<DialogHeader>
+<DialogTitle>
+Edit Analytics Account
+</DialogTitle>
+</DialogHeader>
+
+
+<div className="space-y-4">
+
+
+<Input
+placeholder="Account"
+value={editData.account}
+onChange={(e)=>
+setEditData({
+ ...editData,
+ account:e.target.value
+})
+}
+/>
+
+
+<Input
+placeholder="Reference"
+value={editData.reference}
+onChange={(e)=>
+setEditData({
+ ...editData,
+ reference:e.target.value
+})
+}
+/>
+
+
+<Input
+placeholder="Journal"
+value={editData.journal}
+onChange={(e)=>
+setEditData({
+ ...editData,
+ journal:e.target.value
+})
+}
+/>
+
+
+</div>
+
+
+<DialogFooter className="mt-4">
+
+
+<Button
+variant="outline"
+onClick={()=>
+setEditOpen(false)
+}
+>
+Cancel
+</Button>
+
+
+<Button
+onClick={handleUpdate}
+>
+Update
+</Button>
+
+
+</DialogFooter>
+
+
+</DialogContent>
+
+</Dialog>
 
     </AppLayout>
   );

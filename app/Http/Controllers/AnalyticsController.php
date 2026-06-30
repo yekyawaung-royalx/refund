@@ -24,5 +24,22 @@ class AnalyticsController extends Controller
             
         ]);
     }
+
+    public function update_analytics_accounts(Request $request){
+
+        DB::table('analytics')->where('id',$request->id)->update([
+            'account' => $request->account,
+            'reference' => $request->reference,
+            'journal' => $request->journal,
+        ]);
+
+        $analytics = DB::table('analytics')
+            ->orderBy('account', 'asc')
+            ->paginate(50);
+
+        return redirect()
+            ->route('analytics')
+            ->with('success', 'Account updated successfully.');
+    }
     
 }

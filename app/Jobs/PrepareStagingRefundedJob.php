@@ -35,6 +35,7 @@ class PrepareStagingRefundedJob implements ShouldQueue
                 ON u.waybill_no = s.waybill_no
             SET
                 s.accounting_date = u.accounting_date,
+                s.refund_amount = u.cod_payable_amount,
                 s.updated_at = NOW()
             WHERE
                 s.upload_id = {$this->uploadId}
