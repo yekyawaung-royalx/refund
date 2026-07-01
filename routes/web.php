@@ -76,6 +76,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/exported-files/{id}', [RefundController::class, 'view_exported_file']);
     Route::get('/exported-files/export/download', [RefundController::class, 'exported_file']);
     Route::get('/download-export/{id}', [RefundController::class, 'download_exported_file']);
+    Route::get('/bp-exported-files', [RefundController::class, 'bp_exported_files']);
+    Route::get('/bp-exported-files/export/download', [RefundController::class, 'bp_exported_file']);
     Route::get('/partitions', [PartitionController::class, 'index'])->name('partition.dashboard');
     Route::get('/db-monitoring', [PartitionController::class, 'db_monitoring']);
     Route::get('/reporting', [ReportingController::class, 'index']);

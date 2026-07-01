@@ -230,26 +230,28 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             $rowNumber = 2;
 
             foreach ($insertData as $row) {
+                $sheet->setCellValue("A{$rowNumber}", $row['account']);
+                $sheet->setCellValue("B{$rowNumber}", $row['partner'] ?? '');
+                $sheet->setCellValue("C{$rowNumber}", $row['analytic'] ?? '');
+                $sheet->setCellValue("D{$rowNumber}", $row['date']);
+                $sheet->setCellValue("E{$rowNumber}", $row['due_date']);
 
-                $sheet->fromArray(
-                    [
-                        $row['account'],
-                        $row['partner'],
-                        $row['analytic'],
-                        $row['date'],
-                        $row['due_date'],
-                        $row['debit'],
-                        $row['credit'],
-                        $row['operation_unit'],
-                        $row['label'],
-                    ],
-                    null,
-                    "A{$rowNumber}"
+                // force zero display
+                $sheet->setCellValue(
+                    "F{$rowNumber}",
+                    (float) ($row['debit'] ?? 0)
                 );
 
+                $sheet->setCellValue(
+                    "G{$rowNumber}",
+                    (float) ($row['credit'] ?? 0)
+                );
+
+                $sheet->setCellValue("H{$rowNumber}", $row['operation_unit']);
+                $sheet->setCellValue("I{$rowNumber}", $row['label']);
                 $rowNumber++;
             }
-
+            
             // auto size columns
             foreach (range('A','I') as $column) {
                 $sheet->getColumnDimension($column)

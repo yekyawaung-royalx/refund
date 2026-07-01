@@ -54,6 +54,13 @@ const mainNavItems: NavItem[] = [
         permission: "exported-files",
         icon: FileInputIcon,
     },
+    {
+        title: 'BP Exported Files',
+        href: '/bp-exported-files',
+        permission: "exported-files",
+        icon: FileInputIcon,
+    }
+    
 ];
 
 const refundNavItems: NavItem[] = [

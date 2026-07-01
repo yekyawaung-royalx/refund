@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Jobs\ExportExpressFileJob;
 use App\Jobs\ExportSameDayFileJob;
+use App\Jobs\BpExportExpressFileJob;
 use App\Jobs\DailyRefundSummaryJob;
 
 class RefundController extends Controller
@@ -262,7 +263,7 @@ class RefundController extends Controller
 
     public function exported_files(Request $request){
         $startTime = microtime(true);
-        $exports = DB::table('exports')->orderBy('id','desc')->paginate(20);
+        $exports = DB::table('exports')->where('service_type','!=','all')->orderBy('id','desc')->paginate(20);
 
         $endTime = microtime(true);
         // execution time (seconds)
@@ -273,6 +274,24 @@ class RefundController extends Controller
 
         //return response()->json($exports);
         return Inertia::render('refunds/ExportedFile',[
+            'execution_time_ms' => $executionTimeMs,
+            'exports' => $exports,
+        ]);
+    }
+
+    public function bp_exported_files(Request $request){
+        $startTime = microtime(true);
+        $exports = DB::table('exports')->where('service_type','all')->orderBy('id','desc')->paginate(20);
+
+        $endTime = microtime(true);
+        // execution time (seconds)
+        $executionTime = $endTime - $startTime;
+
+        // milliseconds
+        $executionTimeMs = round($executionTime * 1000, 2);
+
+        //return response()->json($exports);
+        return Inertia::render('refunds/BpExportedFile',[
             'execution_time_ms' => $executionTimeMs,
             'exports' => $exports,
         ]);
@@ -313,6 +332,17 @@ class RefundController extends Controller
 
         ExportExpressFileJob::dispatch($date);
         ExportSameDayFileJob::dispatch($date);
+
+        return response()->json([
+            'message' => 'Export started successfully.'
+        ]);
+    }
+
+    public function bp_exported_file(Request $request){
+        $from = $request->input('from', now()->format('Ym'));
+        $to = $request->input('to', now()->format('Ym'));
+
+        BpExportExpressFileJob::dispatch($from,$to);
 
         return response()->json([
             'message' => 'Export started successfully.'
