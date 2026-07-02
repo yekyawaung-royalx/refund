@@ -9,6 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class GenerateFinanceCodRefundJob implements ShouldQueue
 {
@@ -130,79 +132,106 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     $invoiceGroup2 +
                     $invoiceGroup3;
 
+                $paymentDate = $this->paymentDate;
+
                 // ============================================
                 // Build CSV Rows
                 // ============================================
                 $rows = [
-
-                    ['Type', 'Vendor', '', '', ''],
-
                     [
-                        'E/PUB/PJ/PT',
                         '231604',
-                        'CA-Cash In Hand E Code Interim',
                         '',
-                        number_format((float) $group1, 2, '.', '')
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
+                        '0.00',
+                        number_format((float) $group1, 2, '.', ''),
+                        'OPR',
+                        $paymentDate.' Vendor Refund E/PUB/PJ/PT CA-Cash In Hand E Code Interim'
                     ],
 
                     [
-                        'BP',
                         '231600',
-                        'CA-Cash In Hand BPAZ Interim',
                         '',
-                        number_format((float) $group2, 2, '.', '')
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
+                        '0.00',
+                        number_format((float) $group2, 2, '.', ''),
+                        'OPR',
+                        $paymentDate.'Vendor Refund BP CA-Cash In Hand BPAZ Interim'
                     ],
 
                     [
-                        'Same Day',
                         '231606',
-                        'CA-Cash In Hand Same Day Interim A/C',
                         '',
-                        number_format((float) $group3, 2, '.', '')
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
+                        '0.00',
+                        number_format((float) $group3, 2, '.', ''),
+                        'OPR',
+                        $paymentDate.' Vendor Refund Same Day CA-Cash In Hand Same Day Interim A/C'
                     ],
 
                     [
-                        '',
                         '355003',
-                        'CL-Payable - Last Mile (New)',
+                        '',
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
                         number_format((float) $totalCredit, 2, '.', ''),
-                        ''
+                        '0.00',
+                        'OPR',
+                        $paymentDate.' Vendor Refund CL-Payable - Last Mile (New)'
                     ],
 
-                    ['', '', '', '', ''],
-
-                    ['Type', 'Invoice', '', '', ''],
-
                     [
-                        'E/PUB/PJ/PT',
                         '231604',
-                        'CA-Cash in Hand E Code Interim',
+                        '',
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
+                        '0.00',
                         number_format(abs((float) $invoiceGroup1), 2, '.', ''),
-                        ''
+                        'OPR',
+                        $paymentDate.' Vendor Invoice E/PUB/PJ/PT CA-Cash In Hand E Code Interim'
                     ],
 
                     [
-                        'BP',
                         '231600',
-                        'CA-Cash in Hand BPAZ Interim',
+                        '',
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
+                        '0.00',
                         number_format(abs((float) $invoiceGroup2), 2, '.', ''),
-                        ''
+                        'OPR',
+                        $paymentDate.' Vendor Invoice BP CA-Cash In Hand BPAZ Interim'
                     ],
 
                     [
-                        'Same Day',
                         '231606',
-                        'CA-Cash in Hand Same Day Interim A/C',
+                        '',
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
+                        '0.00',
                         number_format(abs((float) $invoiceGroup3), 2, '.', ''),
-                        ''
+                        'OPR',
+                        $paymentDate.' Vendor Invoice Same Day CA-Cash In Hand Same Day Interim A/C'
                     ],
 
                     [
-                        '',
                         '272750',
-                        'CA-Last Mile (Receivable)',
                         '',
-                        number_format(abs((float) $invoiceTotalCredit), 2, '.', '')
+                        'YGN',
+                        $paymentDate,
+                        $paymentDate,
+                        number_format(abs((float) $invoiceTotalCredit), 2, '.', ''),
+                        '0.00',
+                        'OPR',
+                        $paymentDate.' Vendor Refund CL-Payable - Last Mile (Receivable)'
                     ],
                 ];
 
@@ -210,14 +239,11 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 // Generate File
                 // ============================================
                 $folder = now()->format('Y-m');
+                $fileName = "cod-refund-{$this->paymentDate}-" .
+                        now()->format('Ymd_His') .
+                        ".xlsx";
 
-                $fileName =
-                    "cod-refund-{$this->paymentDate}-" .
-                    now()->format('Ymd_His') .
-                    ".csv";
-
-                $directory =
-                    storage_path("app/private/finance-reports/{$folder}");
+                $directory = storage_path("app/private/finance-reports/{$folder}");
 
                 if (!is_dir($directory)) {
                     mkdir($directory, 0755, true);
@@ -225,29 +251,59 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
 
                 $filePath = "{$directory}/{$fileName}";
 
-                $handle = fopen($filePath, 'w');
+                $spreadsheet = new Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+                $sheet->setTitle('COD Refund');
 
-                fputcsv($handle, [
-                    '',
-                    '',
-                    '',
-                    '',
-                    $this->paymentDate
-                ]);
-
-                fputcsv($handle, [
-                    'Customer',
-                    'Payable Account',
-                    'COA Name',
+                // Header
+                $headers = [
+                    'Account',
+                    'Partner',
+                    'Analytic Account',
+                    'Date',
+                    'Due Date',
                     'Debit',
-                    'Credit'
-                ]);
+                    'Credit',
+                    'Operating Unit',
+                    'Label'
+                ];
 
-                foreach ($rows as $row) {
-                    fputcsv($handle, $row);
+                $sheet->fromArray(
+                    $headers,
+                    null,
+                    'A1'
+                );
+
+                // Data Rows
+                $sheet->fromArray(
+                    $rows,
+                    null,
+                    'A2'
+                );
+
+
+                // Auto width
+                foreach (range('A','I') as $column) {
+                    $sheet
+                        ->getColumnDimension($column)
+                        ->setAutoSize(true);
                 }
 
-                fclose($handle);
+                // Header style
+                $sheet->getStyle('A1:I1')->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                    ],
+                    'alignment' => [
+                        'horizontal' => 'center',
+                    ],
+                ]);
+
+                // Save xlsx
+                $writer = new Xlsx($spreadsheet);
+                $writer->save($filePath);
+                $spreadsheet->disconnectWorksheets();
+                unset($spreadsheet);
 
                 // ============================================
                 // Save Export Record
@@ -273,15 +329,16 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 // ============================================
                 // Update Export Flag
                 // ============================================
-                $updatedRows = DB::table('upload_data')
-                    ->whereDate('payment_date', $this->paymentDate)
-                    ->where('refund', 1)
-                    ->whereIn('vendor_type', ['Vendor', 'Invoice'])
-                    ->where('cod_refund_export', 0)
-                    ->update([
-                        'cod_refund_export' => $exportId,
-                        'updated_at' => now(),
-                    ]);
+                // $updatedRows = DB::table('upload_data')
+                //     ->whereDate('payment_date', $this->paymentDate)
+                //     ->where('refund', 1)
+                //     ->whereIn('vendor_type', ['Vendor', 'Invoice'])
+                //     ->where('cod_refund_export', 0)
+                //     ->update([
+                //         'cod_refund_export' => $exportId,
+                //         'updated_at' => now(),
+                //     ]);
+                $updatedRows = count($rows);
 
                 // ============================================
                 // Action Log
