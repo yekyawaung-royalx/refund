@@ -193,7 +193,7 @@ class GenerateFinanceBranchBankDepositJob implements ShouldQueue
             $folder = now()->format('Y-m');
             $timestamp = now()->format('Ymd_His');
 
-            $fileName = "branches-depoit-{$this->accountingDate}-{$timestamp}.xlsx";
+            $fileName = "branches-deposit-{$this->accountingDate}-{$timestamp}.xlsx";
 
             $relativePath = "private/finance-reports/{$folder}/{$fileName}";
 
