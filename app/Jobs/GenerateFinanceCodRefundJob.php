@@ -183,7 +183,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                         number_format((float) $totalCredit, 2, '.', ''),
                         '0.00',
                         'OPR',
-                        $paymentDate.' Vendor Refund CL-Payable - Last Mile (New)'
+                        $paymentDate.' Invoice Refund CL-Payable - Last Mile (New)'
                     ],
 
                     [
@@ -207,7 +207,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                         '0.00',
                         number_format(abs((float) $invoiceGroup2), 2, '.', ''),
                         'OPR',
-                        $paymentDate.' Vendor Invoice BP CA-Cash In Hand BPAZ Interim'
+                        $paymentDate.' Invoice Refund BP CA-Cash In Hand BPAZ Interim'
                     ],
 
                     [
@@ -219,7 +219,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                         '0.00',
                         number_format(abs((float) $invoiceGroup3), 2, '.', ''),
                         'OPR',
-                        $paymentDate.' Vendor Invoice Same Day CA-Cash In Hand Same Day Interim A/C'
+                        $paymentDate.' Invoice Refund Same Day CA-Cash In Hand Same Day Interim A/C'
                     ],
 
                     [
@@ -231,7 +231,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                         number_format(abs((float) $invoiceTotalCredit), 2, '.', ''),
                         '0.00',
                         'OPR',
-                        $paymentDate.' Vendor Refund CL-Payable - Last Mile (Receivable)'
+                        $paymentDate.' Invoice Refund CL-Payable - Last Mile (Receivable)'
                     ],
                 ];
 

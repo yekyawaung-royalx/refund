@@ -50,6 +50,20 @@ export default function View() {
     );
   }, [search, rows]);
   
+  const ACCOUNT_HEADER = "Account";
+
+  const formatCell = (cell: any, colIndex: number) => {
+  const header = headers[colIndex];
+
+  if (header === ACCOUNT_HEADER) {
+    const str = String(cell);
+    if (/^\d+\.00$/.test(str)) {
+      return str.replace(".00", "");
+    }
+  }
+
+  return String(cell ?? "");
+};
 
   // pagination
   const totalPages = Math.ceil(filteredRows.length / perPage);
@@ -107,7 +121,7 @@ export default function View() {
                       <TableRow key={i}>
                         {row.map((cell, j) => (
                           <TableCell key={j} className="whitespace-nowrap">
-                            {cell || ""}
+                            {formatCell(cell, j)}
                           </TableCell>
                         ))}
                       </TableRow>

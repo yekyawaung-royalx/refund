@@ -9,6 +9,11 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 
 class GenerateFinanceSenderReceiverJob implements ShouldQueue
 {
@@ -41,15 +46,15 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             $ids = collect();
             // Header
             $headerRow = [
-                'Journal',
-                'Date',
-                'Ref',
-                'Analytic',
                 'Account',
-                '',
-                'OU',
-                'Dr',
-                'Cr',
+                'Partner',
+                'Analytic Account',
+                'Date',
+                'Due Date',
+                'Debit',
+                'Credit',
+                'Operating Unit',
+                'Label',
             ];
 
             // =========================================================
@@ -90,37 +95,33 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->groupBy('u.origin_branch', 'a.journal')
                     ->get();
 
-                $rows[] = ['', '', '', '', '', '', '', '', ''];
-                $rows[] = ['', '', '', '', 'Sender Pay Prepaid', '', '', '', ''];
                 $rows[] = $headerRow;
-                $firstSenderRow = true;
-                foreach ($senderData as $r) {
+                
+                foreach ($senderData as $s) {
 
                     $rows[] = [
-                        $firstSenderRow ? 'SPPP' : '',
-                        $firstSenderRow ? $this->accountingDate : '',
-                        $firstSenderRow ? 'REF' : '',
-                        $r->branch,
                         '506010',
-                        'Express Income Amount',
-                        'OPR',
+                        '',
+                        $s->branch,
+                        $this->accountingDate,
+                        $this->accountingDate,
                         '0.00',
-                        number_format((float)$r->amount, 2, '.', '')
+                        number_format((float)$s->amount, 2, '.', ''),
+                        'OPR',
+                        $this->accountingDate.' SPPP '.$s->branch.' Express Income Amount'
                     ];
 
                     $rows[] = [
+                        $s->journal,
                         '',
-                        '',
-                        '',
-                        $r->branch,
-                        $r->journal,
-                        'Branch Cash',
+                        $s->branch,
+                        $this->accountingDate,
+                        $this->accountingDate,
+                        number_format((float)$s->amount, 2, '.', ''),
+                        '0.00',
                         'OPR',
-                        number_format((float)$r->amount, 2, '.', ''),
-                        '0.00'
+                        $this->accountingDate.' SPPP '.$s->branch.' Branch Cash'
                     ];
-
-                    $firstSenderRow = false;
                 }
                 
 
@@ -160,37 +161,32 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->groupBy('u.destination_branch', 'a.journal')
                     ->get();
 
-                $rows[] = ['', '', '', '', '', '', '', '', ''];
-                $rows[] = ['', '', '', '', 'Receiver Pay Postpaid', '', '', '', ''];
-                $rows[] = $headerRow;
-                $firstReceiverRow = true;
                 foreach ($receiverData as $r) {
 
                     $rows[] = [
-                        $firstReceiverRow ? 'RPPP' : '',
-                        $firstReceiverRow ? $this->accountingDate : '',
-                        $firstReceiverRow ? 'REF' : '',
-                        $r->branch,
                         '506010',
-                        'Express Income Amount',
-                        'OPR',
+                        '',
+                        $r->branch,
+                        $this->accountingDate,
+                        $this->accountingDate,
                         '0.00',
-                        number_format((float)$r->amount, 2, '.', '')
+                        number_format((float)$r->amount, 2, '.', ''),
+                        'OPR',
+                        $this->accountingDate.' RPPP '.$r->branch.' Express Income Amount'
                     ];
 
                     $rows[] = [
-                        '',
-                        '',
+                        $r->journal,
                         '',
                         $r->branch,
-                        $r->journal,
-                        'Branch Cash',
-                        'OPR',
+                        $this->accountingDate,
+                        $this->accountingDate,
                         number_format((float)$r->amount, 2, '.', ''),
-                        '0.00'
+                        '0.00',
+                        'OPR',
+                        $this->accountingDate.' RPPP '.$r->branch.' Branch Cash'
                     ];
 
-                    $firstReceiverRow = false;
                 }
                
                 // FIXED pluck
@@ -201,10 +197,10 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             $ids = $ids->unique()->values();
 
             // =========================================================
-            // FILE CREATE
+            // FILE CREATE (XLSX)
             // =========================================================
             $folder = now()->format('Y-m');
-            $fileName = "finance-sender-receiver-{$this->accountingDate}-" . now()->format('His') . ".csv";
+            $fileName = "finance-sender-receiver-{$this->accountingDate}-" . now()->format('His') . ".xlsx";
 
             $directory = storage_path("app/private/finance-reports/{$folder}");
 
@@ -215,17 +211,45 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             $filePath = "{$directory}/{$fileName}";
             $relativePath = "private/finance-reports/{$folder}/{$fileName}";
 
-            $handle = fopen($filePath, 'w');
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Sender Receiver');
 
-            if (!$handle) {
-                throw new \Exception("Cannot create file: {$filePath}");
+            $rowIndex = 1;
+            foreach ($rows as $row) {
+                
+                $sheet->setCellValueExplicit(
+                    "A{$rowIndex}",
+                    (string) $row[0],
+                    DataType::TYPE_STRING
+                );
+
+                $sheet->fromArray(
+                    array_slice($row, 1),
+                    null,
+                    "B{$rowIndex}"
+                );
+
+                $rowIndex++;
             }
 
-            foreach ($rows as $r) {
-                fputcsv($handle, $r);
+            foreach (range('A', 'I') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
-            fclose($handle);
+            // Optional
+            $sheet->freezePane('A2');
+            $sheet->setAutoFilter('A1:I1');
+
+            // =========================================================
+            // SAVE XLSX
+            // =========================================================
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($filePath);
+
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+
 
             // =========================================================
             // EXPORT RECORD
@@ -248,14 +272,14 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             // UPDATE upload_data
             // =========================================================
             if ($ids->isNotEmpty()) {
-                $ids->chunk(1000)->each(function ($chunk) use ($exportId) {
-                    DB::table('upload_data')
-                        ->whereIn('id', $chunk)
-                        ->update([
-                            'sender_receiver_export' => $exportId,
-                            'updated_at' => now(),
-                        ]);
-                });
+                // $ids->chunk(1000)->each(function ($chunk) use ($exportId) {
+                //     DB::table('upload_data')
+                //         ->whereIn('id', $chunk)
+                //         ->update([
+                //             'sender_receiver_export' => $exportId,
+                //             'updated_at' => now(),
+                //         ]);
+                // });
             }
 
             DB::table('action_logs')->insert([
