@@ -345,11 +345,11 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 DB::transaction(function () use (
                     $fileName,
                     $folder,
-                    $paymentDate,
                     $rows,
                     &$updatedRows
                 ) {
 
+                $paymentDate = $this->paymentDate;
                 // ============================================
                 // Save Export Record
                 // ============================================
@@ -405,7 +405,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 // ======================================================
                 Log::info(
                     "COD Refund Export Completed | " .
-                    "Payment Date: {$this->accountingDate} | " .
+                    "Payment Date: {$this->paymentDate} | " .
                     "File Name: {$fileName} | " .
                     "Rows: {$updatedRows} | " .
                     "Total Time: " . round(microtime(true) - $startTime, 2) . " sec"
