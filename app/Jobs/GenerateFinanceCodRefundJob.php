@@ -405,7 +405,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 // ======================================================
                 Log::info(
                     "COD Refund Export Completed | " .
-                    "Payment Date: {$paymentDate} | " .
+                    "Payment Date: {$this->accountingDate} | " .
                     "File Name: {$fileName} | " .
                     "Rows: {$updatedRows} | " .
                     "Total Time: " . round(microtime(true) - $startTime, 2) . " sec"
