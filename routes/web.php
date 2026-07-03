@@ -14,6 +14,47 @@ use App\Http\Controllers\LogController;
 use App\Http\Controllers\ArchiveRefundController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+
+
+Route::get('/xlsx', function () {
+
+    $filePath = storage_path('app/private/finance-reports/2026-07/cod-refund-2026-07-02-20260703_114631.xlsx');
+
+    $spreadsheet = IOFactory::load($filePath);
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $highestRow = $sheet->getHighestRow();
+    $highestColumnIndex = Coordinate::columnIndexFromString($sheet->getHighestColumn());
+
+    echo "<pre>";
+
+    for ($row = 1; $row <= $highestRow; $row++) {
+
+    echo "Row: $row\n";
+
+    for ($col = 1; $col <= $highestColumnIndex; $col++) {
+
+        $coordinate = Coordinate::stringFromColumnIndex($col) . $row;
+
+        $cell = $sheet->getCell($coordinate);
+
+        $value = $cell->getFormattedValue();
+        $dataType = $cell->getDataType();
+        $phpType = gettype($value);
+
+        echo "Column {$col} => Value: "
+            . var_export($value, true)
+            . " | DataType: {$dataType}"
+            . " | PHPType: {$phpType}\n";
+    }
+
+    echo "-----------------------------\n";
+}
+
+    echo "</pre>";
+});
 
 Route::get('/generate-waybills', function (){
     $total = 3000; 

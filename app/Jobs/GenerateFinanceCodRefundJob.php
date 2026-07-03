@@ -11,6 +11,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 class GenerateFinanceCodRefundJob implements ShouldQueue
 {
@@ -163,7 +165,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 // ============================================
                 $rows = [
                     [
-                        '231604',
+                        (string) '231604',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -175,7 +177,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ],
 
                     [
-                        '231600',
+                        (string) '231600',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -187,7 +189,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ],
 
                     [
-                        '231606',
+                        (string) '231606',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -199,7 +201,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ],
 
                     [
-                        '355003',
+                        (string) '355003',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -211,7 +213,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ],
 
                     [
-                        '231604',
+                        (string) '231604',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -223,7 +225,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ],
 
                     [
-                        '231600',
+                        (string) '231600',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -235,7 +237,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ],
 
                     [
-                        '231606',
+                        (string) '231606',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -247,7 +249,7 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     ],
 
                     [
-                        '272750',
+                        (string) '272750',
                         '',
                         'YGN',
                         $this->paymentDate,
@@ -299,7 +301,28 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                 ];
 
                 $sheet->fromArray($headers, null, 'A1');
-                $sheet->fromArray($rows, null, 'A2');
+                $rowIndex = 2;
+
+                foreach ($rows as $row) {
+                    $colIndex = 1;
+
+                    foreach ($row as $value) {
+                        $coordinate = Coordinate::stringFromColumnIndex($colIndex) . $rowIndex;
+
+                        if ($colIndex == 1) {
+                            $sheet->setCellValueExplicit(
+                                $coordinate,
+                                (string) $value,
+                                DataType::TYPE_STRING
+                            );
+                        } else {
+                            $sheet->setCellValue($coordinate, $value);
+                        }
+                        $colIndex++;
+                    }
+
+                    $rowIndex++;
+                }
 
                 // ======================================================
                 // Fixed Width
