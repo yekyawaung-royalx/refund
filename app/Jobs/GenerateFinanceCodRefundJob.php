@@ -346,7 +346,8 @@ class GenerateFinanceCodRefundJob implements ShouldQueue
                     $fileName,
                     $folder,
                     $rows,
-                    &$updatedRows
+                    &$updatedRows,
+                    $startTime
                 ) {
 
                 $paymentDate = $this->paymentDate;
