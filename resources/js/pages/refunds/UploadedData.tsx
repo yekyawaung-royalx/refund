@@ -237,7 +237,7 @@ const columnOrder = [
   (col) => data.length > 0 && col in data[0]
 );
   // hide columns
-  const hideColumnIndexes = [3, 6, 7, 20, 22, 23, 24, 27, 40, 41, 42];
+  const hideColumnIndexes = [ 34, 35];
   const initialInvisibleColumns = [
       "detail",
       ...hideColumnIndexes
