@@ -103,16 +103,66 @@ class UploadController extends Controller
             ->with('success', 'File uploaded! File validation started.');
     }
 
-    public function uploaded_files(){
+    public function uploaded_files()
+    {
         $startTime = microtime(true);
-        $files = DB::table('uploads')->orderBy('id','desc')->paginate(20);
 
-        $endTime = microtime(true);
-        // execution time (seconds)
-        $executionTime = $endTime - $startTime;
+        $archiveDb = DB::connection('archive_refund')->getDatabaseName();
 
-        // milliseconds
-        $executionTimeMs = round($executionTime * 1000, 2);
+        $files = DB::table('uploads')
+            ->selectRaw("
+                id,
+                title,
+                category,
+                type,
+                filename,
+                folder,
+                file_path,
+                failed_path,
+                total_rows,
+                processed_rows,
+                failed_rows,
+                status,
+                processed_duration,
+                attempts,
+                error_message,
+                uploaded_by_name,
+                created_at,
+                'primary' as source
+            ")
+            ->unionAll(
+                DB::table("{$archiveDb}.uploads")
+                    ->selectRaw("
+                        upload_id as id,
+                        title,
+                        category,
+                        type,
+                        filename,
+                        folder,
+                        file_path,
+                        failed_path,
+                        total_rows,
+                        processed_rows,
+                        failed_rows,
+                        status,
+                        processed_duration,
+                        attempts,
+                        error_message,
+                        uploaded_by_name,
+                        created_at,
+                        'archive' as source
+                    ")
+            );
+
+        $files = DB::query()
+            ->fromSub($files, 'u')
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
+        $executionTimeMs = round(
+            (microtime(true) - $startTime) * 1000,
+            2
+        );
 
         return Inertia::render('refunds/UploadedFile',[
             'execution_time_ms' => $executionTimeMs,
@@ -124,7 +174,29 @@ class UploadController extends Controller
     {
         $startTime = microtime(true);
 
-        $file = Upload::findOrFail($upload);
+        /**
+         * Find upload from primary first
+         */
+        $file = DB::table('uploads')->where('id', $upload)->first();
+
+        $connection = null;
+
+        /**
+         * If not found, search archive
+         */
+        if (!$file) {
+
+            $file = DB::connection('archive_refund')
+                ->table('uploads')
+                ->where('id', $upload)
+                ->first();
+
+            $connection = 'archive_refund';
+        }
+
+        if (!$file) {
+            abort(404);
+        }
 
         $search = $request->query('search');
 
@@ -134,10 +206,13 @@ class UploadController extends Controller
         $column = $file->category === 'refunded'
             ? 'refund_id'
             : 'norefund_id';
+
         /**
-         * query
+         * upload_data query
          */
-        $query = DB::table('upload_data')->where($column, $upload);
+        $query = DB::connection($connection)
+            ->table('upload_data')
+            ->where($column, $upload);
 
         /**
          * search filter
@@ -145,8 +220,8 @@ class UploadController extends Controller
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('customer', 'like', "%{$search}%")
-                ->orWhere('customer_reference_no', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('customer_reference_no', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -160,7 +235,11 @@ class UploadController extends Controller
             ->filter()
             ->toArray();
 
-        $details = DB::table('upload_details')
+        /**
+         * upload_details from same database
+         */
+        $details = DB::connection($connection)
+            ->table('upload_details')
             ->whereIn('waybill_no', $waybills)
             ->get()
             ->keyBy('waybill_no');
@@ -169,7 +248,10 @@ class UploadController extends Controller
             $item->detail = $details[$item->waybill_no] ?? null;
         }
 
-        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+        $executionTimeMs = round(
+            (microtime(true) - $startTime) * 1000,
+            2
+        );
 
         return Inertia::render('refunds/ViewUploadedFile', [
             'execution_time_ms' => $executionTimeMs,

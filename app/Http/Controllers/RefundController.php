@@ -182,19 +182,19 @@ class RefundController extends Controller
             ->paginate(200)
             ->withQueryString();
         
-        // $waybills = collect($refunds->items())
-        //     ->pluck('waybill_no')
-        //     ->filter()
-        //     ->toArray();
+        $waybills = collect($refunds->items())
+            ->pluck('waybill_no')
+            ->filter()
+            ->toArray();
 
-        // $details = DB::table('upload_details')
-        //     ->whereIn('waybill_no', $waybills)
-        //     ->get()
-        //     ->keyBy('waybill_no');
+        $details = DB::table('upload_details')
+            ->whereIn('waybill_no', $waybills)
+            ->get()
+            ->keyBy('waybill_no');
 
-        // foreach ($refunds->items() as $item) {
-        //     $item->detail = $details[$item->waybill_no] ?? null;
-        // }
+        foreach ($refunds->items() as $item) {
+            $item->detail = $details[$item->waybill_no] ?? null;
+        }
 
         //return $refunds;
         $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
