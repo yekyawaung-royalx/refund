@@ -93,7 +93,7 @@ class ImportAllWaybillsToStagingJob implements ShouldQueue
                     'outbound_date' => $this->parseDate($row[1] ?? null),
                     'customer_order_reference' => $row[3] ?? null,
                     'customer_reference_no' => $row[3] ?? null,
-                    'customer' => $row[4] ?? null,
+                    'customer' => $this->clean($row[4] ?? null, 255),
                     'phone' => $row[5] ?? null,
                     'mobile' => $row[6] ?? null,
                     'operator' => $row[7] ?? null,

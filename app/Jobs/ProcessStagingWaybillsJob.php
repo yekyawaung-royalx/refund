@@ -91,14 +91,14 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                                 'waybill_no' => $waybill,
                                 'outbound_date' => $item['outboundDate'],
                                 'customer_reference_no' => $row->customer_reference_no ?? null,
-                                'customer' => $row->customer ?? null,
+                                'customer' => $this->clean($row->customer ?? null, 255),
                                 'from_city' => $row->from_city ?? null,
                                 'origin_branch' => $row->origin_branch ?? null,
                                 'to_city' => $row->to_city ?? null,
                                 'destination_branch' => $row->destination_branch ?? null,
                                 'from_analytic_account' => $row->from_analytic_account,
                                 'to_analytic_account' => $row->to_analytic_account,
-                                'receiver_name' => $row->receiver_name,
+                                'receiver_name' => $this->clean($row->receiver_name ?? null, 255),
                                 'payment_by' => $row->payment_by,
                                 'payment_type' => $row->payment_type,
                                 'service' => $row->service,
@@ -128,10 +128,10 @@ class ProcessStagingWaybillsJob implements ShouldQueue
                                 'operator' => $row->operator,
                                 'pickup_man' => $row->pickup_man,
                                 'other' => $row->other,
-                                'receiver_mobile' => $row->receiver_mobile,
-                                'receiver_address' => $row->receiver_address,
-                                'recipient_name' => $row->recipient_name,
-                                'recipient_phone' => $row->recipient_phone,
+                                'receiver_mobile' => $this->clean($row->receiver_mobile ?? null, 255),
+                                'receiver_address' => $this->clean($row->receiver_address ?? null, 255),
+                                'recipient_name' => $this->clean($row->recipient_name ?? null, 255),
+                                'recipient_phone' => $this->clean($row->recipient_phone ?? null, 255),
                                 'created_at' => $now,
                                 'updated_at' => $now,
                             ];
@@ -294,6 +294,13 @@ class ProcessStagingWaybillsJob implements ShouldQueue
     private function safeDate($v): ?string
     {
         return empty($v) ? null : date('Y-m-d', strtotime($v));
+    }
+
+    private function clean($v, $len = null)
+    {
+        if ($v === null) return null;
+        $v = preg_replace('/[\x00-\x1F\x7F]/u', '', $v);
+        return $len ? mb_substr(trim($v), 0, $len) : trim($v);
     }
 
     private function getAccountingDate($o, $d): ?string
