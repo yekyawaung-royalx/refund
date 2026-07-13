@@ -4,7 +4,7 @@ import * as React from "react";
 import { format } from "date-fns";
 import AppLayout from "@/layouts/app-layout";
 import { type BreadcrumbItem } from "@/types";
-import { Head, usePage} from "@inertiajs/react";
+import { Head } from "@inertiajs/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -124,8 +124,8 @@ export default function FinanceReportCodRefund() {
   const [loading, setLoading] = React.useState<boolean>(true);
   const [currentPage, setCurrentPage] = React.useState<number>(1);
   const [lastPage, setLastPage] = React.useState<number>(1);
-  const [nextPageUrl, setNextPageUrl] = React.useState<string | null>(null);
-  const [prevPageUrl, setPrevPageUrl] = React.useState<string | null>(null);
+  //const [nextPageUrl, setNextPageUrl] = React.useState<string | null>(null);
+  //const [prevPageUrl, setPrevPageUrl] = React.useState<string | null>(null);
 
   // --- Category Options ---
   const categoryOptions = [
@@ -144,8 +144,8 @@ export default function FinanceReportCodRefund() {
       setCurrentPage(data.current_page);
       setLastPage(data.last_page);
 
-      setNextPageUrl(data.next_page_url);
-      setPrevPageUrl(data.prev_page_url);
+      //setNextPageUrl(data.next_page_url);
+      //setPrevPageUrl(data.prev_page_url);
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch exported files");
@@ -319,36 +319,9 @@ export default function FinanceReportCodRefund() {
               </TableBody>
             </Table>
 
-            {/* Pagination */}
-<div className="flex justify-end items-center gap-2 mt-4">
-  
-  <Button
-    size="sm"
-    className="text-white bg-green-500 hover:bg-green-600"
-    disabled={!prevPageUrl}
-    onClick={() => prevPageUrl && fetchFiles(currentPage - 1)}
-  >
-    Previous
-  </Button>
-
-  <span className="text-sm text-muted-foreground">
-    Page {currentPage} of {lastPage}
-  </span>
-
-  <Button
-    size="sm"
-    className="text-white bg-green-500 hover:bg-green-600"
-    disabled={!nextPageUrl}
-    onClick={() => nextPageUrl && fetchFiles(currentPage + 1)}
-  >
-    Next
-  </Button>
-
-</div>
-
             {/* --- Pagination --- */}
             {lastPage > 1 && (
-              <div className="flex justify-center mt-4 space-x-2">
+              <div className="flex justify-end mt-4 space-x-2">
                 <Button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
                   Previous
                 </Button>
