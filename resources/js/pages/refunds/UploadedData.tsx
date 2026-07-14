@@ -152,7 +152,7 @@ function DateRangePicker({
 }
 
 export default function UploadedData() {
-  const { results, execution_time_ms, used_partitions, from, to, category } =
+  const { results, execution_time_ms, used_partitions, refund_query_ms, detail_query_ms, from, to, category } =
     usePage<UploadedDataPageProps>().props;
   //const data: UploadDataItem[] = results?.data ?? [];
   const data: UploadDataItem[] = (results?.data ?? []).map((item: UploadDataItem) => ({
@@ -237,7 +237,7 @@ const columnOrder = [
   (col) => data.length > 0 && col in data[0]
 );
   // hide columns
-  const hideColumnIndexes = [ 34, 35];
+  const hideColumnIndexes = [3, 6, 7, 20, 22, 23, 24, 27, 40, 41, 42];
   const initialInvisibleColumns = [
       "detail",
       ...hideColumnIndexes
@@ -274,8 +274,12 @@ const columnOrder = [
                                 <span className="inline-block border border-green-600 text-green-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{(execution_time_ms / 1000).toFixed(2)} s</span>
                               </div>
                               <div>
-                                <span className="text-sm font-medium">Scan Partitions:</span>{" "}
-                                <span className="inline-block border border-amber-500 text-amber-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{used_partitions}</span>
+                                <span className="text-sm font-medium">queryTime:</span>{" "}
+                                <span className="inline-block border border-amber-500 text-amber-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{refund_query_ms}</span>
+                              </div>
+                              <div>
+                                <span className="text-sm font-medium">detailTime:</span>{" "}
+                                <span className="inline-block border border-amber-500 text-amber-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{detail_query_ms}</span>
                               </div>
                             </div>
                           </CardTitle>
