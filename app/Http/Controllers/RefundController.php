@@ -62,62 +62,147 @@ class RefundController extends Controller
         ]);
     }
 
-    public function refund_dashboard(Request $request){
+    public function refund_dashboard(Request $request)
+    {
         $startTime = microtime(true);
 
         $now = Carbon::now();
-        $startOfMonth = $now->copy()->startOfMonth();
-        $endOfMonth = $now->copy()->endOfMonth();
 
-        // Total records
-        $totalRecords = DB::table('upload_data')->count();
-        $totalRecordsThisMonth = DB::table('upload_data')
-            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->count();
+        $startOfMonth = $now->copy()->startOfMonth()->toDateString();
+        $endOfMonth   = $now->copy()->endOfMonth()->toDateString();
 
-        // Refund = 0
-        $refund0Total = DB::table('upload_data')->where('refund', 0)->count();
-        $refund0ThisMonth = DB::table('upload_data')
-            ->where('refund', 0)
-            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->count();
-        $refund0ThisMonthExport = DB::table('upload_data')
-            ->where('refund', 0)
-            ->where('payment_by', 'Sender Pay')
-            ->where('payment_type', 'Postpaid')
-            ->whereIn('service_type', [
-                'express',
-                'same_day_delivery',
+
+        $stats = DB::table('upload_data')
+            ->selectRaw("
+                COUNT(*) AS total,
+
+
+                SUM(
+                    CASE 
+                        WHEN accounting_date BETWEEN ? AND ?
+                        THEN 1 
+                        ELSE 0 
+                    END
+                ) AS total_this_month,
+
+
+                SUM(
+                    CASE 
+                        WHEN refund = 0 
+                        THEN 1 
+                        ELSE 0 
+                    END
+                ) AS refund0_total,
+
+
+                SUM(
+                    CASE 
+                        WHEN refund = 0
+                        AND accounting_date BETWEEN ? AND ?
+                        THEN 1 
+                        ELSE 0 
+                    END
+                ) AS refund0_this_month,
+
+
+                SUM(
+                    CASE 
+                        WHEN refund = 0
+                        AND payment_by = 'Sender Pay'
+                        AND payment_type = 'Postpaid'
+                        AND service_type IN (
+                            'express',
+                            'same_day_delivery'
+                        )
+                        AND accounting_date BETWEEN ? AND ?
+                        THEN 1 
+                        ELSE 0 
+                    END
+                ) AS refund0_this_month_export,
+
+
+                SUM(
+                    CASE 
+                        WHEN refund = 1 
+                        THEN 1 
+                        ELSE 0 
+                    END
+                ) AS refund1_total,
+
+
+                SUM(
+                    CASE 
+                        WHEN refund = 1
+                        AND accounting_date BETWEEN ? AND ?
+                        THEN 1 
+                        ELSE 0 
+                    END
+                ) AS refund1_this_month
+
+            ", [
+
+                // total this month
+                $startOfMonth,
+                $endOfMonth,
+
+                // refund0 this month
+                $startOfMonth,
+                $endOfMonth,
+
+                // refund0 export
+                $startOfMonth,
+                $endOfMonth,
+
+                // refund1 this month
+                $startOfMonth,
+                $endOfMonth,
+
             ])
-            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->count();
+            ->first();
 
-        // Refund = 1
-        $refund1Total = DB::table('upload_data')->where('refund', 1)->count();
-        $refund1ThisMonth = DB::table('upload_data')
-            ->where('refund', 1)
-            ->whereBetween('accounting_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->count();
 
-        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+        $executionTimeMs = round(
+            (microtime(true) - $startTime) * 1000,
+            2
+        );
+
 
         return Inertia::render('refunds/Dashboard', [
+
             'execution_time_ms' => $executionTimeMs,
+
             'stats' => [
+
                 'total' => [
-                    'all_time' => $totalRecords,
-                    'this_month' => $totalRecordsThisMonth,
+                    'all_time'    => (int) $stats->total,
+                    'this_month'  => (int) $stats->total_this_month,
                 ],
+
+
                 'refund0' => [
-                    'all_time' => $refund0Total,
-                    'this_month' => $refund0ThisMonth,
-                    'this_month_export' => $refund0ThisMonthExport,
+
+                    'all_time' => (int) $stats->refund0_total,
+
+                    'this_month' => (int) $stats->refund0_this_month,
+
+                    'this_month_export' =>
+                        (int) $stats->refund0_this_month_export,
+
                 ],
+
+
                 'refund1' => [
-                    'all_time' => $refund1Total,
-                    'this_month' => $refund1ThisMonth,
+
+                    'all_time' =>
+                        (int) $stats->refund1_total,
+
+                    'this_month' =>
+                        (int) $stats->refund1_this_month,
+
                 ],
+
             ],
+
         ]);
     }
 
