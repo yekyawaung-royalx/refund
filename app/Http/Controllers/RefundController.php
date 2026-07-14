@@ -137,19 +137,11 @@ class RefundController extends Controller
         $payment_by = $request->query('payment_by', 'all'); // all | sender-pay | receiver-pay
         $payment_type = $request->query('payment_type', 'all'); // all | prepaid | postpaid
 
-        // Detect partitions
-        $current = $from->copy()->startOfMonth();
-        $end     = $to->copy()->startOfMonth();
-
-        $usedPartitions = [];
-
-        while ($current <= $end) {
-            $usedPartitions[] = 'P' . $current->format('Ym');
-            $current->addMonth();
-        }
-
         $query = DB::table('upload_data')
-            ->whereBetween('accounting_date', [$from, $to]);
+            ->whereBetween('accounting_date', [
+                $from->toDateString(), 
+                $to->toDateString()
+            ]);
 
         // Category filter
         if ($category === 'no-refund') {
@@ -177,20 +169,38 @@ class RefundController extends Controller
             $query->where('payment_type', 'Postpaid');
         }
 
+        // $explain = DB::select("
+        //     EXPLAIN
+        //     SELECT *
+        //     FROM upload_data
+        //     WHERE accounting_date BETWEEN ? AND ?
+        //     ORDER BY accounting_date DESC
+        //     LIMIT 200
+        // ", [
+        //     $from->toDateString(),
+        //     $to->toDateString()
+        // ]);
+
+
+        $start = microtime(true);
         $refunds = $query
-            ->orderByDesc('outbound_date')
+            ->orderByDesc('accounting_date')
             ->paginate(200)
             ->withQueryString();
+        $queryTime = round((microtime(true)-$start),3);
         
         $waybills = collect($refunds->items())
             ->pluck('waybill_no')
             ->filter()
             ->toArray();
 
+        
+        $detailStart = microtime(true);
         $details = DB::table('upload_details')
             ->whereIn('waybill_no', $waybills)
             ->get()
             ->keyBy('waybill_no');
+        $detailTime = round((microtime(true)-$detailStart),3);
 
         foreach ($refunds->items() as $item) {
             $item->detail = $details[$item->waybill_no] ?? null;
@@ -201,7 +211,9 @@ class RefundController extends Controller
 
         return Inertia::render('refunds/UploadedData', [
             'execution_time_ms' => $executionTimeMs,
-            'used_partitions'   => implode(', ', $usedPartitions),
+            //'mysql_explain'     => $explain,
+            'refund_query_ms'   => $queryTime,
+            'detail_query_ms'   => $detailTime,
             'results'           => $refunds,
             'from'              => $from->toDateString(),
             'to'                => $to->toDateString(),
