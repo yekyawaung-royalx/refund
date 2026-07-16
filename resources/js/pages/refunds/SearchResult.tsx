@@ -204,7 +204,7 @@ const allColumns: string[] = columnOrder.filter(
                               </div>
                               <div>
                                 <span className="text-sm font-medium">Results In:</span>{" "}
-                                <span className="inline-block border border-green-600 text-green-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{(execution_time_ms / 1000).toFixed(2)} s</span>
+                                <span className="inline-block border border-green-600 text-green-600 bg-transparent text-xs font-semibold px-2 py-0.5 rounded-full">{(execution_time_ms / 1000).toFixed(3)} s</span>
                               </div>
                             </div>
                           </CardTitle>
