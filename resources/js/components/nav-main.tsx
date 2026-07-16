@@ -12,28 +12,38 @@ import { Link, usePage } from '@inertiajs/react'
 import { useEffect, useState } from 'react'
 
 export function NavMain({ items = [] }: { items: NavItem[] }) {
+  const { url } = usePage()
+  
   return (
     <SidebarGroup className="px-2 py-0">
       <SidebarGroupLabel>Main</SidebarGroupLabel>
 
       <SidebarMenu>
-        {items.map((item, index) => (
-          <SidebarMenuItem key={index}>
-            {item.children ? (
-              <SubMenu item={item} />
-            ) : (
-              <SidebarMenuButton asChild>
-                <Link
-                  href={item.href!}
-                  className="flex items-center gap-2"
-                >
-                  {item.icon && <item.icon className="h-4 w-4" />}
-                  {item.title}
-                </Link>
-              </SidebarMenuButton>
-            )}
-          </SidebarMenuItem>
-        ))}
+        {items.map((item, index) => {
+          const active = url.startsWith(item.href ?? "")
+        
+          return (
+            <SidebarMenuItem key={index}>
+              {item.children ? (
+                <SubMenu item={item} />
+              ) : (
+                <SidebarMenuButton asChild isActive={active}
+                className="
+            data-[active=true]:bg-green-500
+            data-[active=true]:text-white
+          ">
+                  <Link
+                    href={item.href!}
+                    className="flex items-center gap-2"
+                  >
+                    {item.icon && <item.icon className="h-4 w-4" />}
+                    {item.title}
+                  </Link>
+                </SidebarMenuButton>
+              )}
+            </SidebarMenuItem>
+          )
+        })}
       </SidebarMenu>
     </SidebarGroup>
   )
@@ -59,7 +69,7 @@ function SubMenu({ item }: { item: NavItem }) {
     <div>
       <SidebarMenuButton
         onClick={() => setOpen(!open)}
-        className="flex items-center justify-between w-full"
+        className="flex items-center justify-between w-full "
       >
         <div className="flex items-center gap-2">
           {item.icon && <item.icon className="h-4 w-4" />}
@@ -84,8 +94,8 @@ function SubMenu({ item }: { item: NavItem }) {
                 href={subItem.href!}
                 className={`block text-sm rounded-md px-2 py-1 transition-colors ${
                   active
-                    ? 'bg-muted font-medium text-primary'
-                    : 'hover:text-gray-400'
+                    ? 'bg-green-500 font-medium text-white'
+                    : 'hover:text-green-400'
                 }`}
               >
                 <div className="flex items-center gap-2">

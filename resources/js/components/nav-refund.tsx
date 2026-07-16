@@ -1,30 +1,49 @@
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { useState } from "react";
 
 export function NavReund({ items = [] }: { items: NavItem[] }) {
-    
+    const { url } = usePage()
+
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Refunds</SidebarGroupLabel>
             <SidebarMenu>
-                            {items.map((item, index) => (
-                    <SidebarMenuItem key={index}>
-                      {item.children ? (
-                        <SubMenu item={item} />
-                      ) : (
-                        <SidebarMenuButton asChild>
-                          <Link href={item.href!} className="flex items-center gap-2">
-                            {item.icon && <item.icon className="h-4 w-4" />}
-                            {item.title}
-                          </Link>
-                        </SidebarMenuButton>
-                      )}
-                    </SidebarMenuItem>
-                  ))}
-                        </SidebarMenu>
+                    {items.map((item, index) => {
+
+  const active = url === item.href;
+
+  return (
+    <SidebarMenuItem key={index}>
+      {item.children ? (
+        <SubMenu item={item} />
+      ) : (
+        <SidebarMenuButton
+          asChild
+          isActive={active}
+          className="
+            data-[active=true]:bg-green-500
+            data-[active=true]:text-white
+          "
+        >
+          <Link
+            href={item.href!}
+            className="flex items-center gap-2"
+          >
+            {item.icon && (
+              <item.icon className="h-4 w-4" />
+            )}
+
+            {item.title}
+          </Link>
+        </SidebarMenuButton>
+      )}
+    </SidebarMenuItem>
+  )
+})}
+                  </SidebarMenu>
         </SidebarGroup>
     );
 }
