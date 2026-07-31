@@ -170,97 +170,276 @@ class UploadController extends Controller
         ]);
     }
 
-    public function view_file(Request $request, $upload)
-    {
-        $startTime = microtime(true);
 
-        /**
-         * Find upload from primary first
-         */
-        $file = DB::table('uploads')->where('id', $upload)->first();
+public function view_file(Request $request, $upload)
+{
+    $startTime = microtime(true);
 
-        $connection = null;
+    /**
+     * ---------------------------------------------------------
+     * Performance timing helper
+     * ---------------------------------------------------------
+     */
+    $timings = [];
 
-        /**
-         * If not found, search archive
-         */
-        if (!$file) {
-
-            $file = DB::connection('archive_refund')
-                ->table('uploads')
-                ->where('id', $upload)
-                ->first();
-
-            $connection = 'archive_refund';
-        }
-
-        if (!$file) {
-            abort(404);
-        }
-
-        $search = $request->query('search');
-
-        /**
-         * category based column
-         */
-        $column = $file->category === 'refunded'
-            ? 'refund_id'
-            : 'norefund_id';
-
-        /**
-         * upload_data query
-         */
-        $query = DB::connection($connection)
-            ->table('upload_data')
-            ->where($column, $upload);
-
-        /**
-         * search filter
-         */
-        if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('customer', 'like', "%{$search}%")
-                    ->orWhere('customer_reference_no', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
-        }
-
-        $results = $query
-            ->orderByDesc('outbound_date')
-            ->paginate(200)
-            ->withQueryString();
-
-        $waybills = collect($results->items())
-            ->pluck('waybill_no')
-            ->filter()
-            ->toArray();
-
-        /**
-         * upload_details from same database
-         */
-        $details = DB::connection($connection)
-            ->table('upload_details')
-            ->whereIn('waybill_no', $waybills)
-            ->get()
-            ->keyBy('waybill_no');
-
-        foreach ($results->items() as $item) {
-            $item->detail = $details[$item->waybill_no] ?? null;
-        }
-
-        $executionTimeMs = round(
-            (microtime(true) - $startTime) * 1000,
+    $mark = function (string $name, float $startedAt) use (&$timings) {
+        $timings[$name] = round(
+            (microtime(true) - $startedAt) * 1000,
             2
         );
+    };
 
-        return Inertia::render('refunds/ViewUploadedFile', [
-            'execution_time_ms' => $executionTimeMs,
-            'results'           => $results,
-            'uploadId'          => $upload,
-            'file'              => $file,
-            'search'            => $search,
-        ]);
+    /**
+     * ---------------------------------------------------------
+     * 1. Find upload from primary
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $file = DB::table('uploads')
+        ->where('id', $upload)
+        ->first();
+
+    $mark('01_upload_primary_query', $stepStart);
+
+    $connection = null;
+
+    /**
+     * ---------------------------------------------------------
+     * 2. If not found, search archive
+     * ---------------------------------------------------------
+     */
+    if (!$file) {
+
+        $stepStart = microtime(true);
+
+        $file = DB::connection('archive_refund')
+            ->table('uploads')
+            ->where('id', $upload)
+            ->first();
+
+        $connection = 'archive_refund';
+
+        $mark('02_upload_archive_query', $stepStart);
     }
+
+    if (!$file) {
+        abort(404);
+    }
+
+    /**
+     * ---------------------------------------------------------
+     * 3. Search parameter
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $search = $request->query('search');
+
+    $mark('03_request_search', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 4. Determine column
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $column = $file->category === 'refunded'
+        ? 'refund_id'
+        : 'norefund_id';
+
+    $mark('04_determine_column', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 5. Build upload_data query
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $query = DB::connection($connection)
+        ->table('upload_data')
+        ->where($column, $upload);
+
+    if (!empty($search)) {
+        $query->where(function ($q) use ($search) {
+            $q->where('customer', 'like', "%{$search}%")
+                ->orWhere(
+                    'customer_reference_no',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'phone',
+                    'like',
+                    "%{$search}%"
+                );
+        });
+    }
+
+    $mark('05_build_upload_data_query', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 6. Clone query for debugging SQL
+     * ---------------------------------------------------------
+     */
+    $countQuery = clone $query;
+    $dataQuery = clone $query;
+
+    /**
+     * ---------------------------------------------------------
+     * 7. COUNT query
+     *
+     * paginate() normally executes COUNT separately.
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $total = $countQuery->count();
+
+    $mark('06_upload_data_count', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 8. Data query
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $perPage = 200;
+
+    $page = (int) $request->query('page', 1);
+
+    $results = $dataQuery
+        ->orderByDesc('outbound_date')
+        ->forPage($page, $perPage)
+        ->get();
+
+    $mark('07_upload_data_fetch_200', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 9. Build paginator manually
+     *
+     * This is equivalent to paginate() but allows us to
+     * measure COUNT and DATA query separately.
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $results = new \Illuminate\Pagination\LengthAwarePaginator(
+        $results,
+        $total,
+        $perPage,
+        $page,
+        [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ]
+    );
+
+    $mark('08_build_paginator', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 10. Extract waybill numbers
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $waybills = collect($results->items())
+        ->pluck('waybill_no')
+        ->filter()
+        ->toArray();
+
+    $mark('09_extract_waybills', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 11. upload_details query
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $details = DB::connection($connection)
+        ->table('upload_details')
+        ->whereIn('waybill_no', $waybills)
+        ->get();
+
+    $mark('10_upload_details_query', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 12. keyBy
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    $details = $details->keyBy('waybill_no');
+
+    $mark('11_details_keyBy', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 13. Attach details
+     * ---------------------------------------------------------
+     */
+    $stepStart = microtime(true);
+
+    foreach ($results->items() as $item) {
+        $item->detail = $details[$item->waybill_no] ?? null;
+    }
+
+    $mark('12_attach_details_loop', $stepStart);
+
+    /**
+     * ---------------------------------------------------------
+     * 14. Total execution time
+     * ---------------------------------------------------------
+     */
+    $executionTimeMs = round(
+        (microtime(true) - $startTime) * 1000,
+        2
+    );
+
+    /**
+     * ---------------------------------------------------------
+     * 15. Log timings
+     * ---------------------------------------------------------
+     */
+    \Log::info('view_file performance', [
+        'upload_id' => $upload,
+        'connection' => $connection ?: 'default',
+        'category' => $file->category,
+        'column' => $column,
+        'search' => $search,
+        'total_records' => $total,
+        'page' => $page,
+        'per_page' => $perPage,
+        'waybill_count' => count($waybills),
+        'timings_ms' => $timings,
+        'total_execution_ms' => $executionTimeMs,
+    ]);
+
+    return Inertia::render('refunds/ViewUploadedFile', [
+        'execution_time_ms' => $executionTimeMs,
+
+        // Useful for frontend debugging
+        'performance' => [
+            'timings_ms' => $timings,
+            'total_ms' => $executionTimeMs,
+        ],
+
+        'results' => $results,
+        'uploadId' => $upload,
+        'file' => $file,
+        'search' => $search,
+    ]);
+}
+
+
 
     public function destroy($id)
     {
