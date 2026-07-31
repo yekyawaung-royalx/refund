@@ -313,7 +313,7 @@ public function view_file(Request $request, $upload)
     $page = (int) $request->query('page', 1);
 
     $results = $dataQuery
-        ->orderByDesc('outbound_date')
+        ->orderByDesc('accounting_date')
         ->forPage($page, $perPage)
         ->get();
 
