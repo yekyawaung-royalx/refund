@@ -352,7 +352,7 @@ export default function FinanceReportBranchDeposit() {
             </Table>
 
             {/* Pagination */}
-<div className="flex justify-end items-center gap-2 mt-4">
+{/* <div className="flex justify-end items-center gap-2 mt-4">
   
   <Button
     size="sm"
@@ -376,11 +376,11 @@ export default function FinanceReportBranchDeposit() {
     Next
   </Button>
 
-</div>
+</div> */}
 
             {/* --- Pagination --- */}
             {lastPage > 1 && (
-              <div className="flex justify-center mt-4 space-x-2">
+              <div className="flex justify-end mt-4 space-x-2">
                 <Button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
                   Previous
                 </Button>

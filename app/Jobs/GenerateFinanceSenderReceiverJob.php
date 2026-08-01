@@ -272,14 +272,14 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             // UPDATE upload_data
             // =========================================================
             if ($ids->isNotEmpty()) {
-                // $ids->chunk(1000)->each(function ($chunk) use ($exportId) {
-                //     DB::table('upload_data')
-                //         ->whereIn('id', $chunk)
-                //         ->update([
-                //             'sender_receiver_export' => $exportId,
-                //             'updated_at' => now(),
-                //         ]);
-                // });
+                $ids->chunk(1000)->each(function ($chunk) use ($exportId) {
+                    DB::table('upload_data')
+                        ->whereIn('id', $chunk)
+                        ->update([
+                            'sender_receiver_export' => $exportId,
+                            'updated_at' => now(),
+                        ]);
+                });
             }
 
             DB::table('action_logs')->insert([
