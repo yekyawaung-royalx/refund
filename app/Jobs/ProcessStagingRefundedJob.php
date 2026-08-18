@@ -9,6 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Jobs\UpdateRefundDashboardAnalyticsJob;
 
 class ProcessStagingRefundedJob implements ShouldQueue
 {
@@ -180,6 +181,16 @@ class ProcessStagingRefundedJob implements ShouldQueue
             ->where('upload_id', $this->uploadId)
             ->delete();
         Log::info('CLEANUP DONE');
+
+        /**
+         * STEP 11
+         * UPDATE REFUND DASHBOARD ANALYTICS
+         */
+        UpdateRefundDashboardAnalyticsJob::dispatch();
+
+        Log::info('Refund Dashboard Analytics Job dispatched', [
+            'upload_id' => $this->uploadId,
+        ]);
     }
 
     /**

@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Jobs\AutoCheckAnalyticBranchJob;
+use App\Jobs\UpdateRefundDashboardAnalyticsJob;
 
 class ProcessStagingWaybillsJob implements ShouldQueue
 {
@@ -258,6 +259,18 @@ class ProcessStagingWaybillsJob implements ShouldQueue
             ->where('upload_id', $this->uploadId)
             ->whereIn('status', ['processed', 'failed'])
             ->delete();
+
+        /**
+         * UPDATE REFUND DASHBOARD ANALYTICS
+         *
+         * ProcessStagingWaybillsJob completed successfully.
+         */
+        UpdateRefundDashboardAnalyticsJob::dispatch()
+            ->onQueue('analytics');
+
+        Log::info('Refund Dashboard Analytics Job dispatched', [
+            'upload_id' => $this->uploadId,
+        ]);
     }
 
     // =========================

@@ -66,145 +66,49 @@ class RefundController extends Controller
     {
         $startTime = microtime(true);
 
-        $now = Carbon::now();
-
-        $startOfMonth = $now->copy()->startOfMonth()->toDateString();
-        $endOfMonth   = $now->copy()->endOfMonth()->toDateString();
-
-
-        $stats = DB::table('upload_data')
-            ->selectRaw("
-                COUNT(*) AS total,
-
-
-                SUM(
-                    CASE 
-                        WHEN accounting_date BETWEEN ? AND ?
-                        THEN 1 
-                        ELSE 0 
-                    END
-                ) AS total_this_month,
-
-
-                SUM(
-                    CASE 
-                        WHEN refund = 0 
-                        THEN 1 
-                        ELSE 0 
-                    END
-                ) AS refund0_total,
-
-
-                SUM(
-                    CASE 
-                        WHEN refund = 0
-                        AND accounting_date BETWEEN ? AND ?
-                        THEN 1 
-                        ELSE 0 
-                    END
-                ) AS refund0_this_month,
-
-
-                SUM(
-                    CASE 
-                        WHEN refund = 0
-                        AND payment_by = 'Sender Pay'
-                        AND payment_type = 'Postpaid'
-                        AND service_type IN (
-                            'express',
-                            'same_day_delivery'
-                        )
-                        AND accounting_date BETWEEN ? AND ?
-                        THEN 1 
-                        ELSE 0 
-                    END
-                ) AS refund0_this_month_export,
-
-
-                SUM(
-                    CASE 
-                        WHEN refund = 1 
-                        THEN 1 
-                        ELSE 0 
-                    END
-                ) AS refund1_total,
-
-
-                SUM(
-                    CASE 
-                        WHEN refund = 1
-                        AND accounting_date BETWEEN ? AND ?
-                        THEN 1 
-                        ELSE 0 
-                    END
-                ) AS refund1_this_month
-
-            ", [
-
-                // total this month
-                $startOfMonth,
-                $endOfMonth,
-
-                // refund0 this month
-                $startOfMonth,
-                $endOfMonth,
-
-                // refund0 export
-                $startOfMonth,
-                $endOfMonth,
-
-                // refund1 this month
-                $startOfMonth,
-                $endOfMonth,
-
-            ])
+        $analytics = DB::table('refund_dashboard_analytics')
+            ->where('id', 1)
             ->first();
-
 
         $executionTimeMs = round(
             (microtime(true) - $startTime) * 1000,
             2
         );
 
-
         return Inertia::render('refunds/Dashboard', [
-
             'execution_time_ms' => $executionTimeMs,
 
             'stats' => [
-
                 'total' => [
-                    'all_time'    => (int) $stats->total,
-                    'this_month'  => (int) $stats->total_this_month,
-                ],
-
-
-                'refund0' => [
-
-                    'all_time' => (int) $stats->refund0_total,
-
-                    'this_month' => (int) $stats->refund0_this_month,
-
-                    'this_month_export' =>
-                        (int) $stats->refund0_this_month_export,
-
-                ],
-
-
-                'refund1' => [
-
                     'all_time' =>
-                        (int) $stats->refund1_total,
+                        (int) ($analytics->all_waybills ?? 0),
 
                     'this_month' =>
-                        (int) $stats->refund1_this_month,
-
+                        (int) ($analytics->this_month_all_waybills ?? 0),
                 ],
 
-            ],
+                'refund0' => [
+                    'all_time' =>
+                        (int) ($analytics->all_no_refund_waybills ?? 0),
 
+                    'this_month' =>
+                        (int) ($analytics->this_month_no_refund_waybills ?? 0),
+
+                    'this_month_export' =>
+                        (int) ($analytics->this_month_no_refund_export_waybills ?? 0),
+                ],
+
+                'refund1' => [
+                    'all_time' =>
+                        (int) ($analytics->all_refunded_waybills ?? 0),
+
+                    'this_month' =>
+                        (int) ($analytics->this_month_refunded_waybills ?? 0),
+                ],
+            ],
         ]);
     }
+
 
     public function refunds(Request $request)
     {
