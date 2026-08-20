@@ -1,119 +1,184 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
-import { Card, CardContent, CardTitle } from '@/components/ui/card';
-import { Users, CreditCard, CheckCircle } from 'lucide-react';
+import { CardTitle } from '@/components/ui/card';
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs";
 import * as React from "react";
-import SplashModal from "@/components/SplashModal";
+import DailyRefundSummary from '@/components/dashboard/DailyRefundSummary';
+import RecentUploaded from '@/components/dashboard/RecentUploaded';
+import RecentExported from '@/components/dashboard/RecentExported';
+import RecentRefunds from '@/components/dashboard/RecentRefunds';
+import DashboardCards from '@/components/dashboard/DashboardCards';
+import FileCards from '@/components/dashboard/FileCards';
+import RefundCards from '@/components/dashboard/RefundCards';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
 ];
 
-export default function Dashboard() {
-    const { stats, execution_time_ms } = usePage().props as any;
-    const cardData = [
-        {
-            title: 'No Refund Files',
-            all: stats.refund0.all_time,
-            month: stats.refund0.this_month,
-            icon: <CreditCard className="w-6 h-6 text-white" />,
-            bg: 'bg-gradient-to-r from-rose-400 to-rose-600',
-        },
-        {
-            title: 'Refund Files',
-            all: stats.refund1.all_time,
-            month: stats.refund1.this_month,
-            icon: <CheckCircle className="w-6 h-6 text-white" />,
-            bg: 'bg-gradient-to-r from-emerald-400 to-emerald-600',
-        },
-        {
-            title: 'Users',
-            all: stats.total.all_time,
-            month: stats.total.this_month,
-            icon: <Users className="w-6 h-6 text-white" />,
-            bg: 'bg-gradient-to-r from-sky-400 to-sky-600',
-        },
-        {
-            title: 'Users',
-            all: stats.total.all_time,
-            month: stats.total.this_month,
-            icon: <Users className="w-6 h-6 text-white" />,
-            bg: 'bg-gradient-to-r from-sky-400 to-sky-600',
-        },
-        {
-            title: 'Users',
-            all: stats.total.all_time,
-            month: stats.total.this_month,
-            icon: <Users className="w-6 h-6 text-white" />,
-            bg: 'bg-gradient-to-r from-sky-400 to-sky-600',
-        },
-        {
-            title: 'Users',
-            all: stats.total.all_time,
-            month: stats.total.this_month,
-            icon: <Users className="w-6 h-6 text-white" />,
-            bg: 'bg-gradient-to-r from-sky-400 to-sky-600',
-        },
-    ];
+type Pagination = {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    data: any[];
+};
 
+export default function Dashboard() {
+    const { stats, file_stats, execution_time_ms } = usePage().props as any;
+    //const [summaries, setSummaries] = React.useState<any[]>([]);
+    const [summaryPage, setSummaryPage] = React.useState<Pagination | null>(null);
+    const [loading, setLoading] = React.useState(true); 
+    const [tab, setTab] = React.useState("refund-summary");
+
+    const [uploadedFiles, setUploadedFiles] = React.useState<any[]>([]);
+    const [uploadedLoading, setUploadedLoading] = React.useState(false);
+    const [uploadedLoaded, setUploadedLoaded] = React.useState(false);
+
+    const [exportedFiles, setExportedFiles] = React.useState<any[]>([]);
+    const [exportedLoading, setExportedLoading] = React.useState(false);
+    const [exportedLoaded, setExportedLoaded] = React.useState(false);
+
+    const [refunds, setRefunds] = React.useState<any[]>([]);
+    const [refundLoading, setRefundLoading] = React.useState(false);
+    const [refundLoaded, setRefundLoaded] = React.useState(false);
+    //const [rows, setRows] = React.useState<any[]>([]);
+
+    const loadSummaries = async (page = 1) => {
+        try {
+            setLoading(true);
+
+            const res = await fetch(`/recent-refund-summaries?page=${page}`);
+            const json = await res.json();
+
+            setSummaryPage(json);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+    }
+    };
+
+    React.useEffect(() => {
+        loadSummaries();
+
+        if (tab === "uploaded" && !uploadedLoaded) {
+        setUploadedLoading(true);
+
+        fetch("/recent-uploaded-files")
+        .then((res) => res.json())
+        .then((data) => {
+            setUploadedFiles(data);
+            setUploadedLoading(false);
+            setUploadedLoaded(true);
+        })
+        .catch(() => {
+            setUploadedLoading(false);
+        });
+    }
+
+    // exported
+    if (tab === "exported" && !exportedLoaded) {
+        setExportedLoading(true);
+
+        fetch("/recent-exported-files")
+        .then((res) => res.json())
+        .then((data) => {
+            setExportedFiles(data);
+            setExportedLoading(false);
+            setExportedLoaded(true);
+        });
+    }
+
+    if (tab === "refunds" && !refundLoaded) {
+        setRefundLoading(true);
+
+        fetch("/recent-uploaded-data")
+        .then((res) => res.json())
+        .then((data) => {
+            setRefunds(data);
+            setRefundLoading(false);
+            setRefundLoaded(true);
+        })
+        .catch(() => {
+            setRefundLoading(false);
+        });
+    }
+    }, [tab,exportedLoaded,refundLoaded,uploadedLoaded]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <SplashModal duration={9} />
-            <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                {/* Title + Results In */}
-    <div className="flex flex-col gap-1">
-      {/* Main Title */}
-      <CardTitle className="text-xl md:text-2xl">
-        Main Dashboard
-      </CardTitle>
+            <Head title="Main Dashboard" />
+                <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+                    {/* Title + Results In */}
+                    <div className="flex flex-col gap-1">
+                        {/* Main Title */}
+                        <CardTitle className="text-xl md:text-2xl">
+                            Main Dashboard
+                        </CardTitle>
 
-      {/* Results In + Execution Time */}
-      <div className="flex items-center gap-2 text-sm md:text-base">
-        <span>Results In:</span>
-        <span className="text-green-500 font-light">
-          {(execution_time_ms / 1000).toFixed(2)} s
-        </span>
-      </div>
-    </div>
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    {cardData.map((card) => (
-                        <Card
-    key={card.title}
-    className={`relative overflow-hidden rounded-xl shadow-lg hover:scale-105 transition-transform duration-300`}
->
-    {/* Gradient Background */}
-    <div className={`${card.bg} absolute inset-0 opacity-80`}></div>
+                        {/* Results In + Execution Time */}
+                        <div className="flex items-center gap-2 text-sm md:text-base">
+                            <span>Results In:</span>
+                            <span className="text-green-500 font-light">
+                                {(execution_time_ms / 1000).toFixed(3)} s
+                            </span>
+                        </div>
+                    </div>
+                  <RefundCards stats={stats} />
 
-    <CardContent className="relative z-10 text-white space-y-4">
-        {/* Icon + Title */}
-        <div className="flex items-center gap-2">
-            {card.icon}
-            <CardTitle className="text-white text-lg md:text-xl">{card.title}</CardTitle>
-        </div>
+                  <FileCards stats={file_stats} />
 
-        {/* Main Number Row */}
-        <div className="flex flex-col gap-1 mt-2">
-            {/* This Month */}
-            <div className="text-3xl md:text-4xl font-bold">
-                {new Intl.NumberFormat().format(card.month)}{' '}
-                <span className="text-base font-medium ml-2">
-                    Mar 2026
-                </span>
-            </div>
+                  {/* Main content placeholder */}
+                  <div className="border-sidebar-border/70 dark:border-sidebar-border relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border md:min-h-min p-6">
+                    <Tabs value={tab} onValueChange={setTab} className="w-full">
+                        <TabsList className="grid w-full grid-cols-4">
+                            <TabsTrigger value="refund-summary">Daily Refund Summary</TabsTrigger>
+                            <TabsTrigger value="uploaded">Recent Uploaded</TabsTrigger>
+                            <TabsTrigger value="exported">Recent Exported</TabsTrigger>
+                            <TabsTrigger value="refunds">Recent Refunds</TabsTrigger>
+                        </TabsList>
 
-            {/* All Records */}
-            <div className="text-sm mt-2">
-                <span className="font-semibold">All Records:</span> {new Intl.NumberFormat().format(card.all)}
-            </div>
-        </div>
-    </CardContent>
-</Card>
-                    ))}
+                        {/* Daily Refund */}
+                        <TabsContent value="refund-summary" className="mt-6">
+                            <DailyRefundSummary
+                                summaries={summaryPage}
+                                loading={loading}
+                                //setSummaryPage={setSummaryPage}
+                                onPageChange={loadSummaries}
+                            />
+                        </TabsContent>
+
+                        {/* Uploaded */}
+                        <TabsContent value="uploaded" className="mt-6">
+                            <RecentUploaded
+                                files={uploadedFiles}
+                                loading={uploadedLoading}
+                            />
+                        </TabsContent>
+
+                        {/* Exported */}
+                        <TabsContent value="exported" className="mt-6">
+                            <RecentExported
+                                files={exportedFiles}
+                                loading={exportedLoading}
+                            />
+                        </TabsContent>
+                        
+                        {/* Refunds */}
+                        <TabsContent value="refunds" className="mt-6">
+                            <RecentRefunds
+                                refunds={refunds}
+                                loading={refundLoading}
+                            />
+                        </TabsContent>
+                    </Tabs>
                 </div>
-
             </div>
         </AppLayout>
     );

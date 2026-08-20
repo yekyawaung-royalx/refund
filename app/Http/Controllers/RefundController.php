@@ -19,46 +19,115 @@ use App\Jobs\DailyRefundSummaryJob;
 
 class RefundController extends Controller
 {
-    public function main_dashboard(Request $request){
+    //MainDashboard
+    public function main_dashboard(Request $request)
+    {
+        $now = Carbon::now();
+        $monthStart = $now->copy()->startOfMonth();
+        $nextMonth  = $monthStart->copy()->addMonth();
         $startTime = microtime(true);
-        $cacheKey = 'main_dashboard_stats';
-        
-        //Cache::forget('main_dashboard_stats');
 
-        $stats = Cache::remember($cacheKey, 3600, function () {
-            $now = now();
-            $startOfMonth = $now->copy()->startOfMonth();
-            $endOfMonth = $now->copy()->endOfMonth();
+        $analytics = DB::table('refund_dashboard_analytics')
+            ->where('id', 1)
+            ->first();
 
-            return [
-                'total' => [
-                    'all_time' => DB::table('upload_data')->count(),
-                    'this_month' => DB::table('upload_data')
-                        ->whereBetween('accounting_date', [$startOfMonth, $endOfMonth])
-                        ->count(),
-                ],
-                'refund0' => [
-                    'all_time' => DB::table('upload_data')->where('refund', 0)->count(),
-                    'this_month' => DB::table('upload_data')
-                        ->where('refund', 0)
-                        ->whereBetween('accounting_date', [$startOfMonth, $endOfMonth])
-                        ->count(),
-                ],
-                'refund1' => [
-                    'all_time' => DB::table('upload_data')->where('refund', 1)->count(),
-                    'this_month' => DB::table('upload_data')
-                        ->where('refund', 1)
-                        ->whereBetween('accounting_date', [$startOfMonth, $endOfMonth])
-                        ->count(),
-                ],
-            ];
-        });
+        $executionTimeMs = round(
+            (microtime(true) - $startTime) * 1000,
+            2
+        );
 
-        $executionTimeMs = round((microtime(true) - $startTime) * 1000, 2);
+        $file_stats = DB::table('uploads')
+    ->selectRaw("
+        COUNT(*) AS total,
+
+        /* ===================================================== */
+        /* This Month */
+        /* ===================================================== */
+
+        SUM(
+            created_at >= ?
+            AND created_at < ?
+        ) AS total_this_month,
+
+
+        /* ===================================================== */
+        /* Category: no-refund */
+        /* ===================================================== */
+
+        SUM(
+            category = 'no-refund'
+        ) AS no_refund_total,
+
+        SUM(
+            category = 'no-refund'
+            AND created_at >= ?
+            AND created_at < ?
+        ) AS no_refund_this_month,
+
+
+        /* ===================================================== */
+        /* Category: refunded */
+        /* ===================================================== */
+
+        SUM(
+            category = 'refunded'
+        ) AS refunded_total,
+
+        SUM(
+            category = 'refunded'
+            AND created_at >= ?
+            AND created_at < ?
+        ) AS refunded_this_month
+
+    ", [
+        /* total_this_month */
+        $monthStart,
+        $nextMonth,
+
+        /* no_refund_this_month */
+        $monthStart,
+        $nextMonth,
+
+        /* refunded_this_month */
+        $monthStart,
+        $nextMonth,
+    ])
+    ->first();
+
 
         return Inertia::render('MainDashboard', [
             'execution_time_ms' => $executionTimeMs,
-            'stats' => $stats,
+
+            'stats' => [
+                'total' => [
+                    'all_time' =>
+                        (int) ($analytics->all_waybills ?? 0),
+
+                    'this_month' =>
+                        (int) ($analytics->this_month_all_waybills ?? 0),
+                ],
+
+                'refund0' => [
+                    'all_time' =>
+                        (int) ($analytics->all_no_refund_waybills ?? 0),
+
+                    'this_month' =>
+                        (int) ($analytics->this_month_no_refund_waybills ?? 0),
+
+                    'this_month_export' =>
+                        (int) ($analytics->this_month_no_refund_export_waybills ?? 0),
+                ],
+
+                'refund1' => [
+                    'all_time' =>
+                        (int) ($analytics->all_refunded_waybills ?? 0),
+
+                    'this_month' =>
+                        (int) ($analytics->this_month_refunded_waybills ?? 0),
+                ],
+            ],
+
+            'file_stats' => $file_stats,
         ]);
     }
 
