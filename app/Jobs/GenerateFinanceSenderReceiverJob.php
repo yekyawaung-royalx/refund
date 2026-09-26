@@ -36,10 +36,12 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
         $this->exportedBy = $exportedBy;
     }
 
+
     public function handle()
     {
-        $startTime  = microtime(true);
-        $timings    = [];
+        $startTime = microtime(true);
+        $timings = [];
+
         /*
         |--------------------------------------------------------------------------
         | QUERY EXECUTION LOGGER
@@ -51,11 +53,10 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             'exported_by' => $this->exportedBy,
         ]);
 
-
         try {
-
             $rows = [];
             $ids = collect();
+
             // Header
             $headerRow = [
                 'Account',
@@ -79,12 +80,16 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             // =========================================================
             // 1. SENDER PAY PREPAID
             // =========================================================
-            if ($this->category === 'all' || $this->category === 'sender-pay-prepaid') {
+            if (
+                $this->category === 'all' ||
+                $this->category === 'sender-pay-prepaid'
+            ) {
 
-                $queryStart = microtime(true);
-                // -------------------------
+                // -----------------------------------------------------
                 // IDs (FOR UPDATE ONLY)
-                // -------------------------
+                // -----------------------------------------------------
+                $queryStart = microtime(true);
+
                 $senderIds = (clone $base)
                     ->where('u.payment_by', 'Sender Pay')
                     ->where('u.payment_type', 'Prepaid')
@@ -97,25 +102,37 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
 
                 $timings['sender_ids_count'] = $senderIds->count();
 
-                // -------------------------
+                // -----------------------------------------------------
                 // DATA (FOR EXPORT ONLY)
-                // -------------------------
+                // -----------------------------------------------------
                 $queryStart = microtime(true);
+
                 $senderData = DB::table('upload_data as u')
-                    ->join('analytics as a', 'u.origin_branch', '=', 'a.reference')
-                    ->whereDate('u.accounting_date', $this->accountingDate)
+                    ->join(
+                        'analytics as a',
+                        'u.origin_branch',
+                        '=',
+                        'a.reference'
+                    )
+                    ->whereDate(
+                        'u.accounting_date',
+                        $this->accountingDate
+                    )
                     ->where('u.sender_receiver_export', 0)
                     ->where('u.payment_by', 'Sender Pay')
                     ->where('u.payment_type', 'Prepaid')
                     ->whereNotNull('a.journal')
+                    ->whereIn('u.service_type', ['express', 'priority'])
                     ->select(
                         'u.origin_branch as branch',
                         'a.journal',
                         'u.service_type',
-                        DB::raw('SUM(u.express_income_amount) as amount')
+                        DB::raw(
+                            'SUM(u.express_income_amount) as amount'
+                        )
                     )
                     ->groupBy(
-                        'u.origin_branch', 
+                        'u.origin_branch',
                         'a.journal',
                         'u.service_type'
                     )
@@ -125,73 +142,114 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     (microtime(true) - $queryStart) * 1000,
                     2
                 );
+
                 $timings['sender_data_rows'] = $senderData->count();
 
-                $rows[] = $headerRow;
-                
-                $senderTotal = 0;
+                /*
+                |--------------------------------------------------------------------------
+                | SENDER OUTPUT
+                |
+                | Branch
+                |   ├── Express Credit 506010
+                |   ├── Priority Credit 506015 (if exists)
+                |   └── Debit analytics.journal
+                |--------------------------------------------------------------------------
+                */
 
-                foreach ($senderData as $s) {
-                    $account = $s->service_type === 'priority'
-                        ? '506015'
-                        : '506010';
+                if ($senderData->isNotEmpty()) {
 
-                    $amount = (float) $s->amount;
+                    $rows[] = $headerRow;
 
-                    $senderTotal += $amount;
+                    // Group by branch
+                    $senderBranches = $senderData->groupBy('branch');
 
-                    // Credit
-                    $rows[] = [
-                        $account,
-                        '',
-                        $s->branch,
-                        $this->accountingDate,
-                        $this->accountingDate,
-                        '0.00',
-                        number_format($amount, 2, '.', ''),
-                        'OPR',
-                        $this->accountingDate
-                            . ' SPPP '
-                            . $s->branch
-                            . ' '
-                            . ucfirst($s->service_type)
-                            . ' Income Amount'
-                    ];
+                    foreach ($senderBranches as $branch => $branchRows) {
+
+                        $branchTotal = 0;
+
+                        // -------------------------------------------------
+                        // CREDIT ROWS
+                        // -------------------------------------------------
+                        foreach ($branchRows as $s) {
+
+                            $account = $s->service_type === 'priority'
+                                ? '506015'
+                                : '506010';
+
+                            $amount = (float) $s->amount;
+
+                            $branchTotal += $amount;
+
+                            $rows[] = [
+                                $account,
+                                '',
+                                $branch,
+                                $this->accountingDate,
+                                $this->accountingDate,
+                                '0.00',
+                                number_format(
+                                    $amount,
+                                    2,
+                                    '.',
+                                    ''
+                                ),
+                                'OPR',
+                                $this->accountingDate
+                                    . ' SPPP '
+                                    . $branch
+                                    . ' '
+                                    . ucfirst($s->service_type)
+                                    . ' Income Amount',
+                            ];
+                        }
+
+                        // -------------------------------------------------
+                        // DEBIT ROW
+                        // One Debit row per branch
+                        // -------------------------------------------------
+                        if ($branchTotal > 0) {
+
+                            $journal = $branchRows->first()->journal;
+
+                            $rows[] = [
+                                $journal,
+                                '',
+                                $branch,
+                                $this->accountingDate,
+                                $this->accountingDate,
+                                number_format(
+                                    $branchTotal,
+                                    2,
+                                    '.',
+                                    ''
+                                ),
+                                '0.00',
+                                'OPR',
+                                $this->accountingDate
+                                    . ' SPPP '
+                                    . $branch
+                                    . ' Branch Cash',
+                            ];
+                        }
+                    }
                 }
 
-                // One Debit row
-                if ($senderTotal > 0) {
-                    $rows[] = [
-                        $senderData->first()->journal,
-                        '',
-                        $senderData->first()->branch,
-                        $this->accountingDate,
-                        $this->accountingDate,
-                        number_format($senderTotal, 2, '.', ''),
-                        '0.00',
-                        'OPR',
-                        $this->accountingDate
-                            . ' SPPP '
-                            . $senderData->first()->branch
-                            . ' Branch Cash'
-                    ];
-                }
-                
-
-                // FIXED pluck
-                //$ids = $ids->merge($sender->pluck('id'));
                 $ids = $ids->merge($senderIds);
             }
 
             // =========================================================
             // 2. RECEIVER PAY POSTPAID
             // =========================================================
-            if ($this->category === 'all' || $this->category === 'receiver-pay-postpaid') {
+            if (
+                $this->category === 'all' ||
+                $this->category === 'receiver-pay-postpaid'
+            ) {
 
-                // -------------------------
+                // -----------------------------------------------------
                 // IDs (FOR UPDATE ONLY)
-                // -------------------------
+                // -----------------------------------------------------
                 $queryStart = microtime(true);
+
                 $receiverIds = (clone $base)
                     ->where('u.payment_by', 'Receiver Pay')
                     ->where('u.payment_type', 'Postpaid')
@@ -201,15 +259,25 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     (microtime(true) - $queryStart) * 1000,
                     2
                 );
+
                 $timings['receiver_ids_count'] = $receiverIds->count();
 
-                // -------------------------
+                // -----------------------------------------------------
                 // DATA (FOR EXPORT ONLY)
-                // -------------------------
+                // -----------------------------------------------------
                 $queryStart = microtime(true);
+
                 $receiverData = DB::table('upload_data as u')
-                    ->join('analytics as a', 'u.destination_branch', '=', 'a.reference')
-                    ->whereDate('u.accounting_date', $this->accountingDate)
+                    ->join(
+                        'analytics as a',
+                        'u.destination_branch',
+                        '=',
+                        'a.reference'
+                    )
+                    ->whereDate(
+                        'u.accounting_date',
+                        $this->accountingDate
+                    )
                     ->where('u.sender_receiver_export', 0)
                     ->where('u.payment_by', 'Receiver Pay')
                     ->where('u.payment_type', 'Postpaid')
@@ -219,10 +287,12 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                         'u.destination_branch as branch',
                         'a.journal',
                         'u.service_type',
-                        DB::raw('SUM(u.express_income_amount) as amount')
+                        DB::raw(
+                            'SUM(u.express_income_amount) as amount'
+                        )
                     )
                     ->groupBy(
-                        'u.destination_branch', 
+                        'u.destination_branch',
                         'a.journal',
                         'u.service_type'
                     )
@@ -232,87 +302,140 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     (microtime(true) - $queryStart) * 1000,
                     2
                 );
+
                 $timings['receiver_data_rows'] = $receiverData->count();
 
-                $receiverTotal = 0;
+                /*
+                |--------------------------------------------------------------------------
+                | RECEIVER OUTPUT
+                |
+                | Branch
+                |   ├── Express Credit 506010
+                |   ├── Priority Credit 506015 (if exists)
+                |   └── Debit analytics.journal
+                |--------------------------------------------------------------------------
+                */
 
-                foreach ($receiverData as $r) {
-                    $account = $r->service_type === 'priority'
-                        ? '506015'
-                        : '506010';
+                if ($receiverData->isNotEmpty()) {
 
-                    $amount = (float) $r->amount;
+                    $rows[] = $headerRow;
 
-                    // Total for Debit row
-                    $receiverTotal += $amount;
+                    // Group by branch
+                    $receiverBranches = $receiverData->groupBy('branch');
 
-                    // Credit row
-                    $rows[] = [
-                        $account,
-                        '',
-                        $r->branch,
-                        $this->accountingDate,
-                        $this->accountingDate,
-                        '0.00',
-                        number_format($amount, 2, '.', ''),
-                        'OPR',
-                        $this->accountingDate
-                            . ' RPPP '
-                            . $r->branch
-                            . ' '
-                            . ucfirst($r->service_type)
-                            . ' Income Amount'
-                    ];
+                    foreach ($receiverBranches as $branch => $branchRows) {
+
+                        $branchTotal = 0;
+
+                        // -------------------------------------------------
+                        // CREDIT ROWS
+                        // -------------------------------------------------
+                        foreach ($branchRows as $r) {
+
+                            $account = $r->service_type === 'priority'
+                                ? '506015'
+                                : '506010';
+
+                            $amount = (float) $r->amount;
+
+                            $branchTotal += $amount;
+
+                            $rows[] = [
+                                $account,
+                                '',
+                                $branch,
+                                $this->accountingDate,
+                                $this->accountingDate,
+                                '0.00',
+                                number_format(
+                                    $amount,
+                                    2,
+                                    '.',
+                                    ''
+                                ),
+                                'OPR',
+                                $this->accountingDate
+                                    . ' RPPP '
+                                    . $branch
+                                    . ' '
+                                    . ucfirst($r->service_type)
+                                    . ' Income Amount',
+                            ];
+                        }
+
+                        // -------------------------------------------------
+                        // DEBIT ROW
+                        // One Debit row per branch
+                        // -------------------------------------------------
+                        if ($branchTotal > 0) {
+
+                            $journal = $branchRows->first()->journal;
+
+                            $rows[] = [
+                                $journal,
+                                '',
+                                $branch,
+                                $this->accountingDate,
+                                $this->accountingDate,
+                                number_format(
+                                    $branchTotal,
+                                    2,
+                                    '.',
+                                    ''
+                                ),
+                                '0.00',
+                                'OPR',
+                                $this->accountingDate
+                                    . ' RPPP '
+                                    . $branch
+                                    . ' Branch Cash',
+                            ];
+                        }
+                    }
                 }
 
-                // One Debit row only
-                if ($receiverTotal > 0) {
-                    $rows[] = [
-                        $receiverData->first()->journal,
-                        '',
-                        $receiverData->first()->branch,
-                        $this->accountingDate,
-                        $this->accountingDate,
-                        number_format($receiverTotal, 2, '.', ''),
-                        '0.00',
-                        'OPR',
-                        $this->accountingDate
-                            . ' RPPP '
-                            . $receiverData->first()->branch
-                            . ' Branch Cash'
-                    ];
-                }
-               
-                // FIXED pluck
-                //$ids = $ids->merge($receiver->pluck('id'));
                 $ids = $ids->merge($receiverIds);
             }
 
+            // =========================================================
+            // UNIQUE IDS
+            // =========================================================
             $ids = $ids->unique()->values();
 
             // =========================================================
             // FILE CREATE (XLSX)
             // =========================================================
             $xlsxStart = microtime(true);
-            $folder = now()->format('Y-m');
-            $fileName = "finance-sender-receiver-{$this->accountingDate}-" . now()->format('His') . ".xlsx";
 
-            $directory = storage_path("app/private/finance-reports/{$folder}");
+            $folder = now()->format('Y-m');
+
+            $fileName =
+                "finance-sender-receiver-{$this->accountingDate}-"
+                . now()->format('His')
+                . ".xlsx";
+
+            $directory =
+                storage_path("app/private/finance-reports/{$folder}");
 
             if (!is_dir($directory)) {
                 mkdir($directory, 0775, true);
             }
 
             $filePath = "{$directory}/{$fileName}";
-            $relativePath = "private/finance-reports/{$folder}/{$fileName}";
+
+            $relativePath =
+                "private/finance-reports/{$folder}/{$fileName}";
 
             $spreadsheet = new Spreadsheet();
+
             $sheet = $spreadsheet->getActiveSheet();
+
             $sheet->setTitle('Sender Receiver');
 
             $rowIndex = 1;
+
             foreach ($rows as $row) {
-                
+
                 $sheet->setCellValueExplicit(
                     "A{$rowIndex}",
                     (string) $row[0],
@@ -329,7 +452,9 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             }
 
             foreach (range('A', 'I') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
+                $sheet
+                    ->getColumnDimension($col)
+                    ->setAutoSize(true);
             }
 
             // Optional
@@ -340,14 +465,18 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                 (microtime(true) - $xlsxStart) * 1000,
                 2
             );
+
             $timings['xlsx_rows'] = count($rows);
 
             // =========================================================
             // SAVE XLSX
             // =========================================================
             $saveStart = microtime(true);
+
             $writer = new Xlsx($spreadsheet);
+
             $writer->save($filePath);
+
             $timings['xlsx_save_ms'] = round(
                 (microtime(true) - $saveStart) * 1000,
                 2
@@ -359,13 +488,14 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             );
 
             $spreadsheet->disconnectWorksheets();
-            unset($spreadsheet);
 
+            unset($spreadsheet);
 
             // =========================================================
             // EXPORT RECORD
             // =========================================================
-            $exportDbStart = microtime(true); /*<-- start log -->*/
+            $exportDbStart = microtime(true);
+
             $exportId = DB::table('finance_exports')->insertGetId([
                 'filename' => $fileName,
                 'filepath' => $relativePath,
@@ -374,39 +504,50 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                 'category' => $this->category,
                 'filtered' => $this->category ?? 'ALL',
                 'total_rows' => count($rows),
-                'duration' => round(microtime(true) - $startTime, 2),
+                'duration' => round(
+                    microtime(true) - $startTime,
+                    2
+                ),
                 'exported_by' => $this->exportedBy,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            /*<-- end log -->*/
             $timings['export_db_ms'] = round(
                 (microtime(true) - $exportDbStart) * 1000,
                 2
             );
+
             $timings['export_id'] = $exportId;
 
             // =========================================================
             // UPDATE upload_data
             // =========================================================
             $actionLogStart = microtime(true);
-            if ($ids->isNotEmpty()) {
-                $ids->chunk(1000)->each(function ($chunk) use ($exportId) {
-                    DB::table('upload_data')
-                        ->whereIn('id', $chunk)
-                        ->update([
-                            'sender_receiver_export' => $exportId,
-                            'updated_at' => now(),
-                        ]);
-                });
-            }
+
+            // if ($ids->isNotEmpty()) {
+            //     $ids
+            //         ->chunk(1000)
+            //         ->each(function ($chunk) use ($exportId) {
+
+            //             DB::table('upload_data')
+            //                 ->whereIn('id', $chunk)
+            //                 ->update([
+            //                     'sender_receiver_export' => $exportId,
+            //                     'updated_at' => now(),
+            //                 ]);
+            //         });
+            // }
 
             DB::table('action_logs')->insert([
                 'action' => 'EXPORT',
                 'keywords' => 'FINANCE_SENDER_RECEIVER',
                 'user' => $this->exportedBy,
-                'log' => "Finance export completed ({$this->category}) | {$this->accountingDate} | ID: {$exportId}",
+                'log' =>
+                    "Finance export completed "
+                    . "({$this->category}) | "
+                    . "{$this->accountingDate} | "
+                    . "ID: {$exportId}",
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -430,14 +571,24 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             );
 
             $timings['total_rows'] = count($rows);
+
             $timings['total_ids'] = $ids->count();
 
-            Log::info('[FinanceExport] COMPLETED', $timings);
+            Log::info(
+                '[FinanceExport] COMPLETED',
+                $timings
+            );
 
         } catch (\Throwable $e) {
 
-            Log::error("Finance Export Failed: " . $e->getMessage());
+            Log::error(
+                "Finance Export Failed: "
+                . $e->getMessage()
+            );
+
             throw $e;
         }
     }
+
+
 }
