@@ -123,10 +123,19 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->where('u.payment_type', 'Prepaid')
                     ->whereNotNull('a.journal')
                     ->whereIn('u.service_type', ['express', 'priority'])
+                    // IMPORTANT: 
+                    // Do NOT filter service_type here. 
+                    // priority = 506015 
+                    // everything else = 506010
                     ->select(
                         'u.origin_branch as branch',
                         'a.journal',
-                        'u.service_type',
+                        DB::raw(" 
+                            CASE WHEN u.service_type = 'priority' 
+                            THEN 'priority' 
+                            ELSE 'non_priority' 
+                            END as service_group 
+                        "),
                         DB::raw(
                             'SUM(u.express_income_amount) as amount'
                         )
@@ -134,7 +143,11 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->groupBy(
                         'u.origin_branch',
                         'a.journal',
-                        'u.service_type'
+                        DB::raw(" 
+                            CASE WHEN u.service_type = 'priority' 
+                            THEN 'priority' 
+                            ELSE 'non_priority' END 
+                        ")
                     )
                     ->get();
 
@@ -172,13 +185,12 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                         // -------------------------------------------------
                         foreach ($branchRows as $s) {
 
-                            $account = $s->service_type === 'priority'
-                                ? '506015'
-                                : '506010';
-
+                            $isPriority = $s->service_group === 'priority'; 
+                            $account = $isPriority ? '506015' : '506010';
                             $amount = (float) $s->amount;
 
                             $branchTotal += $amount;
+                            $serviceLabel = $isPriority ? 'Priority' : 'Express';
 
                             $rows[] = [
                                 $account,
@@ -198,7 +210,7 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                                     . ' SPPP '
                                     . $branch
                                     . ' '
-                                    . ucfirst($s->service_type)
+                                    . $serviceLabel
                                     . ' Income Amount',
                             ];
                         }
@@ -283,10 +295,19 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->where('u.payment_type', 'Postpaid')
                     ->whereNotNull('a.journal')
                     ->whereIn('u.service_type', ['express', 'priority'])
+                    // IMPORTANT: 
+                    // Do NOT filter service_type here. 
+                    // priority = 506015 
+                    // everything else = 506010
                     ->select(
                         'u.destination_branch as branch',
                         'a.journal',
-                        'u.service_type',
+                        DB::raw(" 
+                            CASE WHEN u.service_type = 'priority' 
+                            THEN 'priority' 
+                            ELSE 'non_priority' 
+                            END as service_group 
+                        "),
                         DB::raw(
                             'SUM(u.express_income_amount) as amount'
                         )
@@ -294,7 +315,11 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->groupBy(
                         'u.destination_branch',
                         'a.journal',
-                        'u.service_type'
+                        DB::raw(" 
+                            CASE WHEN u.service_type = 'priority' 
+                            THEN 'priority' 
+                            ELSE 'non_priority' END 
+                        ")
                     )
                     ->get();
 
@@ -310,7 +335,7 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                 | RECEIVER OUTPUT
                 |
                 | Branch
-                |   ├── Express Credit 506010
+                |   ├── Express,Same Day, Air Credit 506010
                 |   ├── Priority Credit 506015 (if exists)
                 |   └── Debit analytics.journal
                 |--------------------------------------------------------------------------
@@ -332,13 +357,14 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                         // -------------------------------------------------
                         foreach ($branchRows as $r) {
 
-                            $account = $r->service_type === 'priority'
-                                ? '506015'
-                                : '506010';
+                            $isPriority = $r->service_group === 'priority'; 
+                            $account = $isPriority ? '506015' : '506010';
 
                             $amount = (float) $r->amount;
 
                             $branchTotal += $amount;
+
+                            $serviceLabel = $isPriority ? 'Priority' : 'Express';
 
                             $rows[] = [
                                 $account,
@@ -358,7 +384,7 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                                     . ' RPPP '
                                     . $branch
                                     . ' '
-                                    . ucfirst($r->service_type)
+                                    . $serviceLabel
                                     . ' Income Amount',
                             ];
                         }
