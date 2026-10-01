@@ -122,7 +122,7 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->where('u.payment_by', 'Sender Pay')
                     ->where('u.payment_type', 'Prepaid')
                     ->whereNotNull('a.journal')
-                    ->whereIn('u.service_type', ['express', 'priority'])
+                    //->whereIn('u.service_type', ['express', 'priority'])
                     // IMPORTANT: 
                     // Do NOT filter service_type here. 
                     // priority = 506015 
@@ -294,7 +294,7 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
                     ->where('u.payment_by', 'Receiver Pay')
                     ->where('u.payment_type', 'Postpaid')
                     ->whereNotNull('a.journal')
-                    ->whereIn('u.service_type', ['express', 'priority'])
+                    //->whereIn('u.service_type', ['express', 'priority'])
                     // IMPORTANT: 
                     // Do NOT filter service_type here. 
                     // priority = 506015 
