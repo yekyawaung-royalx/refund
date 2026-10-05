@@ -551,19 +551,19 @@ class GenerateFinanceSenderReceiverJob implements ShouldQueue
             // =========================================================
             $actionLogStart = microtime(true);
 
-            // if ($ids->isNotEmpty()) {
-            //     $ids
-            //         ->chunk(1000)
-            //         ->each(function ($chunk) use ($exportId) {
+            if ($ids->isNotEmpty()) {
+                $ids
+                    ->chunk(1000)
+                    ->each(function ($chunk) use ($exportId) {
 
-            //             DB::table('upload_data')
-            //                 ->whereIn('id', $chunk)
-            //                 ->update([
-            //                     'sender_receiver_export' => $exportId,
-            //                     'updated_at' => now(),
-            //                 ]);
-            //         });
-            // }
+                        DB::table('upload_data')
+                            ->whereIn('id', $chunk)
+                            ->update([
+                                'sender_receiver_export' => $exportId,
+                                'updated_at' => now(),
+                            ]);
+                    });
+            }
 
             DB::table('action_logs')->insert([
                 'action' => 'EXPORT',
