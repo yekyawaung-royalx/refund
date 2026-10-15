@@ -112,8 +112,29 @@ export default function RefundCards({
                                         This Month
                                     </div>
         
-                                    <div className="mt-1 text-4xl font-bold">
-                                        {numberFormat.format(card.month)}
+                                    <div className="grid grid-cols-2 items-center gap-4">
+                                        <div className="mt-1 text-4xl font-bold">
+                                            {numberFormat.format(card.month)}
+                                        </div>
+
+                                        {/* Col 2 */}
+                                        {card.export && (
+                                            <div className="flex items-center justify-between rounded-lg bg-white/10 border border-white/20 px-1.5 py-0.5">
+                                                <span className="text-sm text-slate-300 font-medium">
+                                                    To Refund:
+                                                </span>
+
+                                                <span className="text-lg font-bold text-white">
+                                                    {numberFormat.format(card.export)}
+                                                </span>
+
+                                                {/* Pulse */}
+                                                <span className="relative flex h-3 w-3">
+                                                    <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping"/>
+                                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"/>
+                                                </span>
+                                            </div>
+                                        )} 
                                     </div>
                                 </div>
         

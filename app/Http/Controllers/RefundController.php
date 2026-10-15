@@ -210,6 +210,14 @@ class RefundController extends Controller
             $query->where('refund', 1);
         }
 
+        if ($category === 'open') {
+            $query->where('refund', 2);
+        }
+
+        if ($category === 'paid') {
+            $query->where('refund', 3);
+        }
+
         // Payment By filter
         if ($payment_by === 'sender-pay') {
             $query->where('payment_by', 'Sender Pay');
@@ -225,6 +233,10 @@ class RefundController extends Controller
 
         if ($payment_type === 'postpaid') {
             $query->where('payment_type', 'Postpaid');
+        }
+
+        if ($payment_type === 'invoice') {
+            $query->where('payment_type', 'Invoice');
         }
 
         // $explain = DB::select("

@@ -33,4 +33,19 @@ return [
         ],
     ],
 
+    'open-invoice' => [
+        'columns' => 33,
+        'payment_by' => [
+            'receiver pay',
+            'sender pay',
+        ],
+        'payment_type' => 'invoice',
+        'checks' => [
+            //'delivered_date_required' => true,
+            //'destination_branch_required' => true,
+            'express_income_required' => true,
+        ],
+    ],
+
+
 ];

@@ -11,7 +11,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\LogController;
-use App\Http\Controllers\ArchiveRefundController;
+use App\Http\Controllers\ArchiveRefundController; 
+use App\Http\Controllers\InvoiceController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -20,7 +21,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 Route::get('/xlsx', function () {
 
-    $filePath = storage_path('app/private/finance-reports/2026-07/cod-refund-2026-07-02-20260703_114631.xlsx');
+    $filePath = storage_path('app/private/finance-reports/2026-07/cod-refund-2026-07-02-20260703_135935.xlsx');
 
     $spreadsheet = IOFactory::load($filePath);
     $sheet = $spreadsheet->getActiveSheet();
@@ -28,6 +29,8 @@ Route::get('/xlsx', function () {
     $highestRow = $sheet->getHighestRow();
     $highestColumnIndex = Coordinate::columnIndexFromString($sheet->getHighestColumn());
 
+    echo "<h3>Read xlsx file and data type</h3>";
+    echo "File Name: cod-refund-2026-07-02-20260703_135935.xlsx";
     echo "<pre>";
 
     for ($row = 1; $row <= $highestRow; $row++) {
@@ -142,6 +145,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/recent-refund-summaries', [RefundController::class, 'recent_refund_summaries']);
     Route::post('/updated-recent-refund-summaries', [RefundController::class, 'updated_recent_refund_summaries']);
 
+    Route::get('/invoice-generate', [InvoiceController::class, 'invoice_generate']);
+
     /* Finance Report Routes */
     Route::get('/finance-report/branches-deposit', [ReportingController::class, 'finance_report_branches_deposit']);
     Route::get('/finance-report/branches-deposit/export', [ReportingController::class, 'branches_deposit_export']);
@@ -157,6 +162,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/finance-report/sender-receiver-report/export', [ReportingController::class, 'sender_receiver_export']);
     Route::get('/finance-report/sender-receiver-report/exported-files', [ReportingController::class, 'finance_report_sender_receiver_files']);
     Route::get('/finance-report/sender-receiver-report/exported-files/{id}/download',[ReportingController::class, 'download_exported_sender_receiver_file']);  
+    Route::get('/finance-report/invoice-journal', [ReportingController::class, 'finance_report_invoice_journal']);
+
+    Route::get('/refunds/invoices', [InvoiceController::class, 'invoices'])->name('invoices');
+    Route::get('/refunds/invoices/{invoice}', [InvoiceController::class, 'view'])->name('invoices.view');
+    Route::get('/customers',[InvoiceController::class, 'search_customer']);  
+    Route::post('/generated-invoice',[InvoiceController::class, 'generated_invoice']);
+    Route::get('/refunds/invoices/{invoice}/print',[InvoiceController::class, 'print'])->name('refunds.invoices.print');
+    Route::get('/invoices/customer-summary',[InvoiceController::class, 'customerSummary'])->name('invoices.customer-summary');
 
     Route::get('/notes', [NoteController::class, 'notes']);
     Route::get('/notes/laravel-queue', [NoteController::class, 'laravel_queue']);

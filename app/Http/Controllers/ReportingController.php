@@ -268,6 +268,15 @@ class ReportingController extends Controller
         ]);
     }
 
+    public function finance_report_invoice_journal(Request $request)
+    {
+        $branches = DB::table('analytics')->where('journal','!=','')->get();
+
+        return Inertia::render('reporting/FinanceReportInvoiceJournal', [
+            'branches' => $branches
+        ]);
+    }
+
     public function finance_report_sender_receiver(Request $request)
     {
         $branches = DB::table('analytics')->where('journal','!=','')->get();

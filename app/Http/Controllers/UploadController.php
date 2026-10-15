@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Jobs\CheckAllWaybillsFileJob;
 use App\Jobs\CheckRefundFileJob;
+use App\Jobs\CheckOpenInvoiceFileJob;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use App\Models\Upload;
@@ -57,7 +58,9 @@ class UploadController extends Controller
             'receiver-postpaid',
         ];
 
-        if (in_array($request->category, $waybillCategories)) {
+        if ($request->category === 'open-invoice' || $request->category === 'paid-invoice') {
+            $category = 'invoice';
+        } elseif (in_array($request->category, $waybillCategories)) {
             $category = 'no-refund';
         } else {
             $category = 'refunded';
@@ -92,7 +95,10 @@ class UploadController extends Controller
 
         // Dispatch job based on category 
         // sender-postpaid, sender-prepaid, receiver-postpaid, refund
-        if ($request->category === 'refunded') { 
+
+        if ($request->category === 'open-invoice') { 
+            CheckOpenInvoiceFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name, $request->category); 
+        } elseif ($request->category === 'refunded') { 
             CheckRefundFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name); 
         } else { 
             CheckAllWaybillsFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name, $request->category); 
@@ -171,8 +177,8 @@ class UploadController extends Controller
     }
 
 
-public function view_file(Request $request, $upload)
-{
+    public function view_file(Request $request, $upload)
+    {
     $startTime = microtime(true);
 
     /**
@@ -199,6 +205,7 @@ public function view_file(Request $request, $upload)
     $file = DB::table('uploads')
         ->where('id', $upload)
         ->first();
+    
 
     $mark('01_upload_primary_query', $stepStart);
 

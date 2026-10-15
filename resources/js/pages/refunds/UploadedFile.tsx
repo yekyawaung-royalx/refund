@@ -224,28 +224,45 @@ export default function UploadedFile() {
                                                   : "-"}
                       </TableCell>
                       <TableCell className={cn("truncate", columnWidths.title)}>{item.title}</TableCell>
-                      <TableCell className={columnWidths.category}>
+                    <TableCell className={columnWidths.category}>
                         {item.category === "refunded" ? (
-                          <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
-                            Refunded
-                          </Badge>
+                            <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
+                                Refunded
+                            </Badge>
+                        ) : item.category === "invoice" ? (
+                            <Badge className="border border-sky-600 text-sky-600 bg-transparent rounded-2xl">
+                                Invoice
+                            </Badge>
                         ) : (
-                          <Badge className="border border-amber-500 text-amber-500 bg-transparent rounded-2xl">
-                            No Refund
-                          </Badge>
+                            <Badge className="border border-amber-500 text-amber-500 bg-transparent rounded-2xl">
+                                No Refund
+                            </Badge>
                         )}
-                      </TableCell>
-                      <TableCell className={columnWidths.category}>
-                        {item.category === "refunded" ? (
-                          <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
-                            {item.type}
-                          </Badge>
-                        ) : (
-                          <Badge className="border border-amber-500 text-amber-500 bg-transparent rounded-2xl">
-                            {item.type}
-                          </Badge>
-                        )}
-                      </TableCell>
+                    </TableCell>
+
+
+<TableCell className={columnWidths.category}>
+    {item.category === "refunded" ? (
+        <Badge className="border border-green-600 text-green-600 bg-transparent rounded-2xl">
+            {item.type}
+        </Badge>
+    ) : item.category === "invoice" ? (
+        item.type === "paid-invoice" ? (
+            <Badge className="border border-sky-600 text-sky-600 bg-transparent rounded-2xl">
+                Paid
+            </Badge>
+        ) : (
+            <Badge className="border border-red-500 text-red-500 bg-transparent rounded-2xl">
+                Open
+            </Badge>
+        )
+    ) : (
+        <Badge className="border border-amber-500 text-amber-500 bg-transparent rounded-2xl">
+            {item.type}
+        </Badge>
+    )}
+</TableCell>
+
                       <TableCell className={cn("font-semibold", columnWidths.total_rows)}>{item.total_rows.toLocaleString()}</TableCell>
                       <TableCell className={columnWidths.process_stats}>
                         <span className="text-muted-foreground">Passed:</span> <span className="text-green-500">{item.processed_rows.toLocaleString()}</span> <br />

@@ -289,7 +289,7 @@ export default function ViewUploadedFile() {
                                     key={col}
                                     className={cn("truncate", "w-[150px]")}
                                   >
-                                    {col}
+                                    {col === "refund" ? "status" : col}
                                   </TableHead>
                                 ))}
                     </TableRow>
@@ -303,30 +303,49 @@ export default function ViewUploadedFile() {
                                   .filter((col) => !invisibleColumns.includes(col))
                                   .map((col) => (
                                     <TableCell key={col} className={cn("truncate", "w-[150px]")}>
-                                      {col === "refund" ? (
-                                        <span
-                                          className={cn(
-                                            "px-2 py-1 rounded-full font-semibold text-xs",
-                                            item.refund === 1
-                                              ? "border border-green-600 text-green-600 bg-transparent rounded-2xl"
-                                              : "border border-amber-600 text-amber-600 bg-transparent rounded-2xl"
-                                          )}
-                                        >
-                                          {item.refund === 1 ? "Refunded" : "No Refund"}
-                                        </span>
-                                      ) : col === "waybill_no" ? (
-                                        <span
-                                          className={cn(
-                                            "px-2 py-1 rounded-full font-semibold",
-                                            item.refund === 1 ? "text-green-500" : "text-red-500"
-                                          )}
-                                        >
-                                          {displayValue(item[col])}
-                                        </span>
-                                      ) : (
-                                        displayValue(item[col])
-                                      )}
-                                    </TableCell>
+                                                    {col === "refund" ? (
+                                                        <span
+                                                            className={cn(
+                                                                "px-2 py-1 rounded-full font-semibold text-xs border bg-transparent",
+                                                                item.refund === 0 &&
+                                                                    "border-amber-500 text-amber-500",
+                                                                item.refund === 1 &&
+                                                                    "border-green-600 text-green-600",
+                                                                item.refund === 2 &&
+                                                                    "border-red-600 text-red-600",
+                                                                item.refund === 3 &&
+                                                                    "border-sky-600 text-sky-600"
+                                                            )}
+                                                        >
+                                                            {item.refund === 0
+                                                                ? "No Refund"
+                                                                : item.refund === 1
+                                                                    ? "Refunded"
+                                                                    : item.refund === 2
+                                                                        ? "Open"
+                                                                        : item.refund === 3
+                                                                            ? "Paid"
+                                                                            : "Unknown"}
+                                                        </span>
+                                                    ) : col === "waybill_no" ? (
+                                                        <span
+                                                            className={cn(
+                                                                "px-2 py-1 rounded-full font-semibold",
+                                                                item.refund === 1
+                                                                    ? "text-green-500"
+                                                                    : item.refund === 2
+                                                                        ? "text-red-500"
+                                                                        : item.refund === 3
+                                                                            ? "text-sky-500"
+                                                                            : "text-amber-500"
+                                                            )}
+                                                        >
+                                                            {displayValue(item[col])}
+                                                        </span>
+                                                    ) : (
+                                                        displayValue(item[col])
+                                                    )}
+                                                </TableCell>
                                   ))}
                               </TableRow>
                 ))

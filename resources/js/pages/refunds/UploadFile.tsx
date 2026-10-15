@@ -43,6 +43,16 @@ const waybill_categories = [
     label: "Sender Pay Prepaid",
   },
 ];
+const invoice_categories = [
+  {
+    value: "open-invoice",
+    label: "Open Invoice",
+  },
+  {
+    value: "paid-invoice",
+    label: "Paid Invoice",
+  }
+];
 const refunded_categories = [
   { value: "refunded", label: "Refunded" },
 ];
@@ -52,6 +62,8 @@ const permissionMap: Record<string, string> = {
   "sender-postpaid": "sender-postpaid",
   "sender-prepaid": "sender-prepaid",
   "receiver-postpaid": "receiver-postpaid",
+  "open-invoice": "open-invoice",
+  "paid-invoice": "paid-invoice",
   "refunded": "refund-upload",
 };
 
@@ -72,6 +84,12 @@ export default function UploadFile() {
   );
 }, [auth?.permissions]);
 
+  const filteredInvoiceCategories = React.useMemo(() => {
+  return invoice_categories.filter((c) =>
+    hasPermission(permissionMap[c.value])
+  );
+}, [auth?.permissions]);
+
 const filteredRefundedCategories = React.useMemo(() => {
   return refunded_categories.filter((c) =>
     hasPermission(permissionMap[c.value])
@@ -80,6 +98,7 @@ const filteredRefundedCategories = React.useMemo(() => {
 
 const allCategories = [
   ...filteredWaybillCategories,
+  ...filteredInvoiceCategories,
   ...filteredRefundedCategories,
 ];
 
@@ -223,6 +242,12 @@ React.useEffect(() => {
       );
     }
 
+    if (value === "invoice") {
+      setCategory(
+        filteredInvoiceCategories[0]?.value || ""
+      );
+    }
+
     if (value === "refunded") {
       setCategory(
         filteredRefundedCategories[0]?.value || ""
@@ -233,6 +258,7 @@ React.useEffect(() => {
 >
       <TabsList>
         <TabsTrigger value="waybills">All Waybills</TabsTrigger>
+        <TabsTrigger value="invoice">Invoice</TabsTrigger>
         <TabsTrigger value="refunded">Refunded</TabsTrigger>
       </TabsList>
       <TabsContent value="waybills">
@@ -243,6 +269,59 @@ React.useEffect(() => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
           {filteredWaybillCategories.map((c) => (
+            <label
+              key={c.value}
+              className={cn(
+                "cursor-pointer rounded-2xl border transition-all shadow-sm flex items-start px-2 py-4",
+                category === c.value
+                  ? "border-green-500 bg-green-50 dark:bg-green-950/20 shadow-lg"
+                  : "border-muted bg-white dark:bg-gray-900 hover:border-green-300"
+              )}
+            >
+              <input
+                type="radio"
+                name="category"
+                value={c.value}
+                checked={category === c.value}
+                onChange={() => setCategory(c.value)}
+                className="sr-only"
+              />
+
+              <div
+                className={cn(
+                  "h-5 w-5 rounded-full border flex items-center justify-center",
+                  category === c.value
+                    ? "border-green-500"
+                    : "border-gray-400"
+                )}
+              >
+                {category === c.value && (
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                )}
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm ml-2">
+                  {c.label}
+                </p>
+
+                <p className="text-xs text-muted-foreground ml-2 mt-1">
+                  {c.label} CSV file
+                </p>
+              </div>
+            </label>
+          ))}
+        </div>
+      )}
+    </TabsContent>
+    <TabsContent value="invoice">
+      {filteredWaybillCategories.length === 0 ? (
+        <p className="text-sm text-red-500 mt-3">
+          You don’t have permission to upload files.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
+          {filteredInvoiceCategories.map((c) => (
             <label
               key={c.value}
               className={cn(

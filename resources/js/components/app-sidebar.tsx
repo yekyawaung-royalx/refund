@@ -6,7 +6,7 @@ import { NavBlog } from '@/components/nav-blog';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from "@inertiajs/react";
-import { ActivityIcon, AlarmCheckIcon, BookOpen, CalendarCheck, Database, FileInput, FileInputIcon, FilesIcon, FileUser, FolderInput, HammerIcon, LayoutGrid, MonitorIcon, PieChartIcon, ScanSearchIcon, UploadIcon, UserCircle } from 'lucide-react';
+import { ActivityIcon, AlarmCheckIcon, BookOpen, CalendarCheck, Database, FileInput, FileInputIcon, FilesIcon, FileUser, FolderInput, HammerIcon, LayoutGrid, MonitorIcon, PieChartIcon, ReceiptText, ScanSearchIcon, UploadIcon, UserCircle } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -46,6 +46,12 @@ const mainNavItems: NavItem[] = [
                 permission: "finance-reports", 
                 icon: FileInput 
             },
+            { 
+                title: 'Invoice Journal', 
+                href: '/finance-report/invoice-journal', 
+                permission: "finance-reports", 
+                icon: FileInput 
+            },
         ],
     },
     {
@@ -57,6 +63,12 @@ const mainNavItems: NavItem[] = [
     {
         title: 'BP Exported Files',
         href: '/bp-exported-files',
+        permission: "exported-files",
+        icon: FileInputIcon,
+    },
+    {
+        title: 'Invoice Generate',
+        href: '/invoice-generate',
         permission: "exported-files",
         icon: FileInputIcon,
     }
@@ -87,6 +99,12 @@ const refundNavItems: NavItem[] = [
         href: '/refunds/uploaded-data',
         permission: "uploaded-data",
         icon: Database,
+    },
+    {
+        title: 'Invoices',
+        href: '/refunds/invoices',
+        permission: "uploaded-data",
+        icon: ReceiptText,
     },
     
 ];
