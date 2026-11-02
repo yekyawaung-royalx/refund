@@ -560,9 +560,9 @@ const columnOrder = [
                                 "border-amber-500 text-amber-500",
                             item.refund === 1 &&
                                 "border-green-600 text-green-600",
-                            item.refund === 2 &&
+                            (item.refund === 2 || item.refund === 3) &&
                                 "border-red-600 text-red-600",
-                            item.refund === 3 &&
+                            item.refund === 4 &&
                                 "border-sky-600 text-sky-600"
                         )}
                     >
@@ -570,9 +570,9 @@ const columnOrder = [
                             ? "No Refund"
                             : item.refund === 1
                                 ? "Refunded"
-                                : item.refund === 2
+                                : item.refund === 2 || item.refund === 3
                                     ? "Open"
-                                    : item.refund === 3
+                                    : item.refund === 4
                                         ? "Paid"
                                         : "Unknown"}
                     </span>

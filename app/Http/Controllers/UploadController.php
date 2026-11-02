@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Jobs\CheckAllWaybillsFileJob;
 use App\Jobs\CheckRefundFileJob;
 use App\Jobs\CheckOpenInvoiceFileJob;
+use App\Jobs\CheckPaidInvoiceFileJob;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use App\Models\Upload;
@@ -96,8 +97,11 @@ class UploadController extends Controller
         // Dispatch job based on category 
         // sender-postpaid, sender-prepaid, receiver-postpaid, refund
 
+        
         if ($request->category === 'open-invoice') { 
             CheckOpenInvoiceFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name, $request->category); 
+        } elseif ($request->category === 'paid-invoice') { 
+            CheckPaidInvoiceFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name, $request->category); 
         } elseif ($request->category === 'refunded') { 
             CheckRefundFileJob::dispatch($upload->id, $absolutePath, auth()->user()->name); 
         } else { 

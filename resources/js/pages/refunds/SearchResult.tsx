@@ -281,21 +281,23 @@ const allColumns: string[] = columnOrder.filter(
                                                   "border-amber-500 text-amber-500",
                                               item.refund === 1 &&
                                                   "border-green-600 text-green-600",
-                                              item.refund === 2 &&
+                                              (item.refund === 2 || item.refund === 3) &&
                                                   "border-red-600 text-red-600",
-                                              item.refund === 3 &&
+                                              item.refund === 4 &&
                                                   "border-sky-600 text-sky-600"
                                           )}
                                       >
-                                          {item.refund === 0
-                                              ? "No Refund"
-                                              : item.refund === 1
-                                                  ? "Refunded"
-                                                  : item.refund === 2
-                                                      ? "Open"
-                                                      : item.refund === 3
-                                                          ? "Paid"
-                                                          : "Unknown"}
+                                          
+                                      {item.refund === 0
+                                          ? "No Refund"
+                                          : item.refund === 1
+                                              ? "Refunded"
+                                              : item.refund === 2 || item.refund === 3
+                                                  ? "Open"
+                                                  : item.refund === 4
+                                                      ? "Paid"
+                                                      : "Unknown"}
+
                                       </span>
                                   ) : col === "waybill_no" ? (
                                       <span
@@ -303,9 +305,9 @@ const allColumns: string[] = columnOrder.filter(
                                               "px-2 py-1 rounded-full font-semibold",
                                               item.refund === 1
                                                   ? "text-green-500"
-                                                  : item.refund === 2
+                                                  : item.refund === 2 || item.refund === 3
                                                       ? "text-red-500"
-                                                      : item.refund === 3
+                                                      : item.refund === 4
                                                           ? "text-sky-500"
                                                           : "text-amber-500"
                                           )}
