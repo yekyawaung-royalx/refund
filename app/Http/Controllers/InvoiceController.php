@@ -157,14 +157,14 @@ class InvoiceController extends Controller
             $waybills = DB::table('upload_data')
                 ->select([
                     'waybill_no',
-                    'outbound_date',
+                    'accounting_date',
                     'from_city',
                     'to_city',
                     'weight',
                     'express_income_amount',
                 ])
                 ->where('customer_reference_no', $validated['customer_ref_no'])
-                ->whereBetween('outbound_date', [
+                ->whereBetween('accounting_date', [
                     $validated['date_from'],
                     $validated['date_to'],
                 ])
@@ -284,7 +284,7 @@ class InvoiceController extends Controller
 
             DB::table('upload_data')
                 ->where('customer_reference_no', $validated['customer_ref_no'])
-                ->whereBetween('outbound_date', [
+                ->whereBetween('accounting_date', [
                     $validated['date_from'],
                     $validated['date_to'],
                 ])

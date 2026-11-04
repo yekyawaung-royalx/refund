@@ -212,7 +212,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
                     'date_from' => $fromDate,
                     'date_to' => $toDate,
                     'total_amount' => $totalAmount,
-                    'file_path' => $relativePath,
+                    'file_path' =>  $this->filePath,
                 ]
             );
         } finally {
