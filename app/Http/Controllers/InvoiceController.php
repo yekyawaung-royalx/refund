@@ -263,7 +263,7 @@ class InvoiceController extends Controller
             foreach ($waybills as $waybill) {
                 $invoice->waybills()->create([
                     'waybill_no'             => $waybill->waybill_no,
-                    'outbound_date'          => $waybill->outbound_date,
+                    'outbound_date'          => $waybill->accounting_date,
                     'from_city'              => $waybill->from_city,
                     'to_city'                => $waybill->to_city,
                     'weight'                 => $waybill->weight,
