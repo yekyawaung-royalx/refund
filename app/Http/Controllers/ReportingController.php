@@ -470,5 +470,93 @@ class ReportingController extends Controller
         return response()->download($filePath, $export->filename);
     }
 
+    public function view_finance_exported_invoice_journal_files($id)
+    {
+        $export = FinanceExport::findOrFail($id);
+        $date = Carbon::parse($export->created_at)->format('Y-m');
+        $filename = $export->filename;
+        $filePath = storage_path("app/private/finance-reports/{$date}/{$filename}");
+       
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File not found');
+        }
+
+
+        $rows = [];
+        $headers = [];
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        /*
+        |--------------------------------------------------------------------------
+        | CSV
+        |--------------------------------------------------------------------------
+        */
+        if ($extension === 'csv') {
+            $file = new \SplFileObject($filePath);
+            $file->setFlags(
+                \SplFileObject::READ_CSV |
+                \SplFileObject::SKIP_EMPTY
+            );
+            $file->setCsvControl(",");
+            foreach ($file as $row) {
+
+                if ($row === [null]) {
+                    continue;
+                }
+
+                $rows[] = $row;
+            }
+            $headers = array_shift($rows);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | XLSX
+        |--------------------------------------------------------------------------
+        */
+        elseif ($extension === 'xlsx') {
+            $spreadsheet = IOFactory::load($filePath);
+            $sheet = $spreadsheet->getActiveSheet();
+            $data = $sheet->toArray(
+                null,
+                true,
+                true,
+                true
+            );
+
+            $headers = array_values(array_shift($data));
+            foreach ($data as $row) {
+                $row = array_values($row);
+                $row = array_map(function ($value) {
+                    if (is_numeric($value)) {
+                        return number_format(
+                            (float) $value,
+                            2,
+                            '.',
+                            ''
+                        );
+                    }
+                    return $value;
+
+                }, $row);
+
+                $rows[] = $row;
+            }
+        } else {
+            abort(400, 'Unsupported file format');
+        }
+
+        $rows = array_filter($rows, function ($row) {
+            return is_array($row);
+        });
+
+        return Inertia::render('reporting/ViewExportedFile', [
+            'filename' => $filename,
+            'headers'  => $headers,
+            'rows'     => array_values($rows),
+        ]);
+    }
+
 
 }

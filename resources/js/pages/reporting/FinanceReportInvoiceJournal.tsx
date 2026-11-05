@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Dashboard", href: "/dashboard" },
   { title: "Finance Report", href: "/reports" },
-  { title: "Branches Bank Deposit", href: "#" },
+  { title: "Invoice Journal", href: "#" },
 ];
 
 // --- Types ---
@@ -291,7 +291,7 @@ export default function FinanceReportBranchDeposit() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.location.href = `/finance-report/branches-deposit/exported-files/${file.id}`}
+                          onClick={() => window.location.href = `/finance-report/invoice-journal/exported-files/${file.id}`}
                         >
                           <EyeIcon className="h-4 w-4" />
                         </Button>
