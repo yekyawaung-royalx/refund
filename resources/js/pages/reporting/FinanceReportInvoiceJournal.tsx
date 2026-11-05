@@ -156,7 +156,7 @@ export default function FinanceReportBranchDeposit() {
   const fetchFiles = async (page: number = 1) => {
     try {
       setLoading(true);
-      const res = await fetch(`/finance-report/branches-deposit/exported-files?page=${page}`);
+      const res = await fetch(`/finance-report/invoice-journal/exported-files?page=${page}`);
       const data: PaginatedResponse = await res.json();
 
       setFiles(data.data);
@@ -184,7 +184,7 @@ export default function FinanceReportBranchDeposit() {
   };
 
   const handleDownload = (id: number) => {
-    window.open(`/finance-report/branches-deposit/exported-files/${id}/download`, "_blank");
+    window.open(`/finance-report/invoice-journal/exported-files/${id}/download`, "_blank");
   };
 
   // --- Export Handler ---
@@ -196,7 +196,7 @@ export default function FinanceReportBranchDeposit() {
         category: category !== "ALL" ? category! : "",
       }).toString();
 
-      const response = await fetch(`/finance-report/branches-deposit/export?${query}`, {
+      const response = await fetch(`/finance-report/invoice-journal/export?${query}`, {
         method: "GET",
       });
 
