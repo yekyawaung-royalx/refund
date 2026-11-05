@@ -443,5 +443,12 @@ class ReportingController extends Controller
         return response()->download($filePath, $export->filename);
     }
 
+    public function finance_exported_invoice_journal_files(Request $request)
+    {
+        $files = DB::table('finance_exports')->where('report_type','invoice-journal')->orderBy('id','desc')->paginate(20);
+
+        return response()->json($files);
+    }
+
 
 }

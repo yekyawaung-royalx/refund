@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Jobs;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use RuntimeException;
 use Throwable;
 
@@ -34,17 +36,20 @@ class GenerateInvoiceJournalJob implements ShouldQueue
         public string $analyticAccount = 'YGN',
         public string $operatingUnit = 'PMO',
         public ?array $waybillNos = null,
+        public ?int $exportedBy = null,
     ) {
     }
 
     public function handle(): void
     {
+        $startTime = microtime(true);
+
+        $disk = Storage::disk('local');
+
         $fromDate = Carbon::parse($this->dateFrom)->toDateString();
         $toDate = Carbon::parse($this->dateTo)->toDateString();
 
-        $invoiceDate = Carbon::parse(
-            $this->invoiceDate
-        )->toDateString();
+        $invoiceDate = Carbon::parse($this->invoiceDate)->toDateString();
 
         $dueDate = $this->dueDate
             ? Carbon::parse($this->dueDate)->toDateString()
@@ -57,10 +62,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
         */
 
         $query = DB::table('upload_data')
-            ->where(
-                'customer_reference_no',
-                $this->customerRefNo
-            )
+            ->where('customer_reference_no', $this->customerRefNo)
             ->whereBetween('accounting_date', [
                 $fromDate,
                 $toDate,
@@ -73,10 +75,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
                 );
             }
 
-            $query->whereIn(
-                'waybill_no',
-                $this->waybillNos
-            );
+            $query->whereIn('waybill_no', $this->waybillNos);
         }
 
         /*
@@ -85,9 +84,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
         |--------------------------------------------------------------------------
         */
 
-        $totalAmount = (float) $query->sum(
-            'express_income_amount'
-        );
+        $totalAmount = (float) $query->sum('express_income_amount');
 
         if ($totalAmount <= 0) {
             throw new RuntimeException(
@@ -136,6 +133,13 @@ class GenerateInvoiceJournalJob implements ShouldQueue
 
         $spreadsheet = new Spreadsheet();
 
+        // Keep generated files inside finance-reports.
+        $fileName = basename($this->filePath);
+
+        $relativePath = 'finance-reports/invoice-journals/' . $fileName;
+
+        $fileSaved = false;
+
         try {
             $sheet = $spreadsheet->getActiveSheet();
 
@@ -162,9 +166,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
 
             $sheet->getStyle('A1:I1')
                 ->getFill()
-                ->setFillType(
-                    \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID
-                )
+                ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()
                 ->setARGB('FFDCE6F1');
 
@@ -195,26 +197,81 @@ class GenerateInvoiceJournalJob implements ShouldQueue
             |--------------------------------------------------------------------------
             */
 
-            $directory = dirname($this->filePath);
+            $directory = dirname($relativePath);
 
-            Storage::disk('local')->makeDirectory($directory);
+            $disk->makeDirectory($directory);
 
-            $absolutePath = Storage::disk('local')->path(
-                $this->filePath
-            );
+            $absolutePath = $disk->path($relativePath);
 
             (new Xlsx($spreadsheet))->save($absolutePath);
+
+            $fileSaved = true;
+
+            /*
+            |--------------------------------------------------------------------------
+            | 6. Save export information to finance_exports
+            |--------------------------------------------------------------------------
+            */
+
+            $exportDuration = round(
+                microtime(true) - $startTime,
+                2
+            );
+
+            $exportId = DB::table('finance_exports')->insertGetId([
+                'filename' => $fileName,
+                'filepath' => $relativePath,
+                'report_date' => $invoiceDate,
+                'report_type' => 'invoice-journal',
+                'category' => null,
+                'filtered' => $this->customerRefNo,
+                'total_rows' => count($rows),
+                'duration' => $exportDuration,
+                'exported_by' => $this->exportedBy,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | 7. Log success
+            |--------------------------------------------------------------------------
+            */
 
             logger()->info(
                 'Invoice journal generated successfully.',
                 [
+                    'export_id' => $exportId,
                     'customer_ref_no' => $this->customerRefNo,
                     'date_from' => $fromDate,
                     'date_to' => $toDate,
+                    'invoice_date' => $invoiceDate,
                     'total_amount' => $totalAmount,
-                    'file_path' =>  $this->filePath,
+                    'total_rows' => count($rows),
+                    'duration' => $exportDuration,
+                    'file_path' => $relativePath,
+                    'exported_by' => $this->exportedBy,
                 ]
             );
+
+        } catch (Throwable $exception) {
+
+            // Remove generated file if database insertion fails.
+            if ($fileSaved && $disk->exists($relativePath)) {
+                $disk->delete($relativePath);
+            }
+
+            logger()->error(
+                'Invoice journal generation failed.',
+                [
+                    'customer_ref_no' => $this->customerRefNo,
+                    'file_path' => $relativePath,
+                    'error' => $exception->getMessage(),
+                ]
+            );
+
+            throw $exception;
+
         } finally {
             $spreadsheet->disconnectWorksheets();
         }
@@ -222,7 +279,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        logger()->error('Invoice journal generation failed.', [
+        logger()->error('Invoice journal generation failed permanently.', [
             'customer_ref_no' => $this->customerRefNo,
             'date_from' => $this->dateFrom,
             'date_to' => $this->dateTo,
