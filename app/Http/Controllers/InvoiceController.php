@@ -147,6 +147,7 @@ class InvoiceController extends Controller
             'total_amount_words' => ['nullable', 'string'],
             'waybill_details'    => ['nullable', 'boolean'],
         ]);
+        $exportedBy = Auth::id();
 
         return DB::transaction(function () use ($validated) {
             /*
@@ -299,7 +300,7 @@ class InvoiceController extends Controller
             | 7. Call GenerateInvoiceJournalJob
             |--------------------------------------------------------------------------
             */
-            $fileName = 'invoice-journal-' . now()->format('Ymd-His') . '.xlsx';
+            //$fileName = 'invoice-journal-' . now()->format('Ymd-His') . '.xlsx';
 
             GenerateInvoiceJournalJob::dispatch(
                 customerRefNo: $validated['customer_ref_no'],
@@ -310,8 +311,8 @@ class InvoiceController extends Controller
                 analyticAccount: 'YGN',
                 operatingUnit: 'PMO',
                 waybillNos: $waybillNos->all(),
-                filePath: $fileName,
-                exportedBy: auth()->user()->id,
+                filePath: $filePath,
+                exportedBy: $exportedBy,
             )->afterCommit();
 
             /*

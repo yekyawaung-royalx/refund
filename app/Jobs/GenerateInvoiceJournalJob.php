@@ -135,7 +135,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
         // Keep generated files inside finance-reports.
         $fileName = basename($this->filePath);
 
-        $relativePath = 'finance-reports/invoice-journals/' . $fileName;
+        $relativePath = $this->filePath;
 
         $fileSaved = false;
 

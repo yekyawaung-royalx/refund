@@ -450,5 +450,25 @@ class ReportingController extends Controller
         return response()->json($files);
     }
 
+    public function download_exported_invoice_journal_file($id)
+    {
+        $export = DB::table('finance_exports')->where('id', $id)->first();
+
+        if (!$export) {
+            abort(404, 'File not found');
+        }
+
+        // folder from created_at
+        $folder = Carbon::parse($export->created_at)->format('Y-m');
+
+        $filePath = storage_path("app/private/finance-reports/{$folder}/{$export->filename}");
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File does not exist');
+        }
+
+        return response()->download($filePath, $export->filename);
+    }
+
 
 }
