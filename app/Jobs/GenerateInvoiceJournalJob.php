@@ -222,7 +222,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
                 'filepath' => $relativePath,
                 'report_date' => $invoiceDate,
                 'report_type' => 'invoice-journal',
-                'category' => null,
+                'category' => 'ALL',
                 'filtered' => $this->customerRefNo,
                 'total_rows' => count($rows),
                 'duration' => $exportDuration,
