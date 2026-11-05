@@ -229,7 +229,7 @@ export default function FinanceReportBranchDeposit() {
         {/* --- Table --- */}
         <Card>
           <CardHeader>
-            <CardTitle>Exported Finance Branches Bank Deposit Reports</CardTitle>
+            <CardTitle>Exported Finance Invoice Journal Reports</CardTitle>
           </CardHeader>
 
           <CardContent className="overflow-x">

@@ -149,7 +149,7 @@ class InvoiceController extends Controller
         ]);
         $exportedBy = Auth::id();
 
-        return DB::transaction(function () use ($validated) {
+        return DB::transaction(function () use ($validated, $exportedBy) {
             /*
             |--------------------------------------------------------------------------
             | 1. Find available waybills FIRST

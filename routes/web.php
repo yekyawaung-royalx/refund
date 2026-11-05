@@ -164,8 +164,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/finance-report/sender-receiver-report/exported-files/{id}/download',[ReportingController::class, 'download_exported_sender_receiver_file']);  
     Route::get('/finance-report/invoice-journal', [ReportingController::class, 'finance_report_invoice_journal']);
     Route::get('/finance-report/invoice-journal/exported-files', [ReportingController::class, 'finance_exported_invoice_journal_files']);
-    Route::get('/finance-report/invoice-journal/exported-files/{id}', [ReportingController::class, 'view_finance_exported_branches_deposit_files']);
-    Route::get('/finance-report/invoice-journal/exported-files/{id}/download',[ReportingController::class, 'download_exported_branches_deposit_file']); 
+    Route::get('/finance-report/invoice-journal/exported-files/{id}', [ReportingController::class, 'view_finance_exported_invoice_journal_files']);
+    Route::get('/finance-report/invoice-journal/exported-files/{id}/download',[ReportingController::class, 'download_exported_invoice_journal_file']); 
 
     Route::get('/refunds/invoices', [InvoiceController::class, 'invoices'])->name('invoices');
     Route::get('/refunds/invoices/{invoice}', [InvoiceController::class, 'view'])->name('invoices.view');
