@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Invoice;
 use Illuminate\Validation\ValidationException;
 use App\Jobs\GenerateInvoiceJournalJob;
+use Auth;
 
 class InvoiceController extends Controller
 {
@@ -212,7 +213,7 @@ class InvoiceController extends Controller
             | 4. Create Invoice
             |--------------------------------------------------------------------------
             */
-            $directory = 'exports/' . now()->format('Y-m');
+            $directory = 'finance-reports/' . now()->format('Y-m');
             $safeCustomerRef = preg_replace(
                 '/[^A-Za-z0-9_-]/',
                 '_',
@@ -298,6 +299,8 @@ class InvoiceController extends Controller
             | 7. Call GenerateInvoiceJournalJob
             |--------------------------------------------------------------------------
             */
+            $fileName = 'invoice-journal-' . now()->format('Ymd-His') . '.xlsx';
+
             GenerateInvoiceJournalJob::dispatch(
                 customerRefNo: $validated['customer_ref_no'],
                 dateFrom: $validated['date_from'],
@@ -307,7 +310,8 @@ class InvoiceController extends Controller
                 analyticAccount: 'YGN',
                 operatingUnit: 'PMO',
                 waybillNos: $waybillNos->all(),
-                filePath: $filePath,
+                filePath: $fileName,
+                exportedBy: auth()->user()->id,
             )->afterCommit();
 
             /*
