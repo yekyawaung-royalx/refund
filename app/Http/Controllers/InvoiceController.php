@@ -304,6 +304,7 @@ class InvoiceController extends Controller
 
             GenerateInvoiceJournalJob::dispatch(
                 customerRefNo: $validated['customer_ref_no'],
+                refDate: $validated['ref_no'],
                 dateFrom: $validated['date_from'],
                 dateTo: $validated['date_to'],
                 invoiceDate: $validated['invoice_date'],

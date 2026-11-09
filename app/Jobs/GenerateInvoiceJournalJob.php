@@ -26,6 +26,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
 
     public function __construct(
         public string $customerRefNo,
+        public string $refDate,
         public string $dateFrom,
         public string $dateTo,
         public string $invoiceDate,
@@ -101,26 +102,26 @@ class GenerateInvoiceJournalJob implements ShouldQueue
 
         $rows = [
             [
-                '506011',
-                $this->customerRefNo,
-                $this->analyticAccount,
-                $invoiceDate,
-                $dueDate,
-                $totalAmount,
-                0,
-                $this->operatingUnit,
-                "{$invoiceDate} {$this->customerRefNo} Invoice Income for {$period}",
-            ],
-            [
                 '272381',
                 $this->customerRefNo,
                 $this->analyticAccount,
                 $invoiceDate,
                 $dueDate,
+                $totalAmount,
+                0,
+                $this->operatingUnit,
+                "{$invoiceDate} {$this->customerRefNo} Invoice Income for {$this->refDate}",
+            ],
+            [
+                '506011',
+                $this->customerRefNo,
+                $this->analyticAccount,
+                $invoiceDate,
+                $dueDate,
                 0,
                 $totalAmount,
                 $this->operatingUnit,
-                "{$invoiceDate} {$this->customerRefNo} Invoice Receivable for {$period}",
+                "{$invoiceDate} {$this->customerRefNo} Invoice Receivable for {$this->refDate}",
             ],
         ];
 
