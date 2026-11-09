@@ -12,6 +12,7 @@ interface Invoice {
     customer_ref_no?: string;
     contact_no?: string;
     address?: string;
+    description?: string;
 
     date_from?: string;
     date_to?: string;
@@ -21,8 +22,11 @@ interface Invoice {
     subtotal?: number;
     tax?: number;
     tax_rate?: number;
+    tax_amount?: number;
+    untaxed_amount?: number;
     grand_total?: number;
     total_amount?: number;
+    waybill_details?: number;
 
     total_amount_words?: string;
 
@@ -475,7 +479,7 @@ export default function Print({
                 }
 
                 .summary-label {
-                    width: 58%;
+                    width: 50%;
 
                     text-align: left;
 
@@ -485,7 +489,7 @@ export default function Print({
                 }
 
                 .summary-value {
-                    width: 42%;
+                    width: 50%;
 
                     text-align: right;
 
@@ -929,7 +933,8 @@ export default function Print({
                             </span>
 
                             <span className="info-value">
-                                {invoice.company ?? "-"}
+                                {invoice.attention ?? "-"} 
+                                ({invoice.customer_ref_no ?? "-"})
                             </span>
 
                         </div>
@@ -1108,10 +1113,7 @@ export default function Print({
                         <tr>
 
                             <td className="description-cell">
-
-                                Express Mail Service Charges For{" "}
-
-                                {invoice.invoice_date ?? "-"}
+                                {invoice.description ?? "-"}
 
                             </td>
 
@@ -1136,9 +1138,11 @@ export default function Print({
                             </td>
 
                             <td className="amount-cell">
+                                
                                 {formatAmount(
-                                    invoice.total_amount
+                                    invoice.untaxed_amount
                                 )}
+                                
                             </td>
 
                         </tr>
@@ -1185,7 +1189,7 @@ export default function Print({
 
                                             <td className="summary-value">
                                                 {formatAmount(
-                                                    invoice.subtotal
+                                                    invoice.untaxed_amount
                                                 )}
                                             </td>
 
@@ -1196,13 +1200,12 @@ export default function Print({
 
                                             <td className="summary-label">
                                                 Tax{" "}
-                                                {invoice.tax_rate ??
-                                                    0} %
+                                                {Number(invoice.tax ?? 0)} %
                                             </td>
 
                                             <td className="summary-value">
                                                 {formatAmount(
-                                                    invoice.tax
+                                                    invoice.tax_amount
                                                 )}
                                             </td>
 
@@ -1217,7 +1220,7 @@ export default function Print({
 
                                             <td className="summary-value">
                                                 {formatAmount(
-                                                    invoice.grand_total
+                                                    invoice.total_amount
                                                 )}
                                             </td>
 
@@ -1415,7 +1418,7 @@ export default function Print({
                 {/* =================================================
     WAYBILL DETAILS
 ================================================= */}
-
+{Number(invoice.waybill_details) === 1 && (
 <div className="waybill-section">
 
     <div className="waybill-title">
@@ -1523,6 +1526,7 @@ export default function Print({
     </table>
 
 </div>
+)}
 
 
                 {/* =================================================
