@@ -84,7 +84,15 @@ class GenerateInvoiceJournalJob implements ShouldQueue
         |--------------------------------------------------------------------------
         */
 
-        $totalAmount = (float) $query->sum('express_income_amount');
+        $amounts = $query->selectRaw('
+            SUM(untaxed_amount) as untaxed_amount,
+            SUM(tax_amount) as tax_amount,
+            SUM(total_amount) as total_amount
+        ')->first();
+
+        $untaxedAmount = (float) ($amounts->untaxed_amount ?? 0);
+        $taxAmount = (float) ($amounts->tax_amount ?? 0);
+        $totalAmount = (float) ($amounts->total_amount ?? 0);
 
         if ($totalAmount <= 0) {
             throw new RuntimeException(
@@ -100,29 +108,49 @@ class GenerateInvoiceJournalJob implements ShouldQueue
 
         $period = Carbon::parse($invoiceDate)->format('F Y');
 
-        $rows = [
-            [
-                '272381',
+        $rows = [];
+
+        // 1. Invoice Income (Debit)
+        $rows[] = [
+            '272381',
+            $this->customerRefNo,
+            $this->analyticAccount,
+            $invoiceDate,
+            $dueDate,
+            $untaxedAmount,
+            0,
+            $this->operatingUnit,
+            "{$invoiceDate} {$this->customerRefNo} Invoice Income for {$this->refDate}",
+        ];
+
+        // 2. Tax Row (Only when tax amount > 0)
+        if (round($taxAmount, 2) > 0) {
+            $taxRate = $untaxedAmount > 0 ? round(($taxAmount / $untaxedAmount) * 100, 2) : 0;
+
+            $rows[] = [
+                '272384',
                 $this->customerRefNo,
                 $this->analyticAccount,
                 $invoiceDate,
                 $dueDate,
-                $totalAmount,
                 0,
+                $taxAmount,
                 $this->operatingUnit,
-                "{$invoiceDate} {$this->customerRefNo} Invoice Income for {$this->refDate}",
-            ],
-            [
-                '506011',
-                $this->customerRefNo,
-                $this->analyticAccount,
-                $invoiceDate,
-                $dueDate,
-                0,
-                $totalAmount,
-                $this->operatingUnit,
-                "{$invoiceDate} {$this->customerRefNo} Invoice Receivable for {$this->refDate}",
-            ],
+                "{$invoiceDate} {$this->customerRefNo} Invoice Tax {$taxRate}% for {$this->refDate}",
+            ];
+        }
+
+        // 3. Invoice Receivable (Total Amount)
+        $rows[] = [
+            '506011',
+            $this->customerRefNo,
+            $this->analyticAccount,
+            $invoiceDate,
+            $dueDate,
+            $totalAmount,
+            0,
+            $this->operatingUnit,
+            "{$invoiceDate} {$this->customerRefNo} Invoice Receivable for {$this->refDate}",
         ];
 
         /*
@@ -170,11 +198,13 @@ class GenerateInvoiceJournalJob implements ShouldQueue
                 ->getStartColor()
                 ->setARGB('FFDCE6F1');
 
-            $sheet->getStyle('F2:G3')
-                ->getNumberFormat()
-                ->setFormatCode('#,##0.00;[Red](#,##0.00);-');
+            $lastRow = count($rows) + 1;
 
-            $sheet->getStyle('D2:E3')
+            $sheet->getStyle("F2:G{$lastRow}")
+                ->getNumberFormat()
+                ->setFormatCode('#,##0.00;[Red]\(#,##0.00);-');
+
+            $sheet->getStyle("D2:E{$lastRow}")
                 ->getNumberFormat()
                 ->setFormatCode('yyyy-mm-dd');
 
@@ -185,7 +215,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
 
             $sheet->getColumnDimension('I')->setWidth(65);
 
-            $sheet->getStyle('I2:I3')
+            $sheet->getStyle("I2:I{$lastRow}")
                 ->getAlignment()
                 ->setWrapText(true);
 
