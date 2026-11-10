@@ -303,6 +303,7 @@ class InvoiceController extends Controller
             //$fileName = 'invoice-journal-' . now()->format('Ymd-His') . '.xlsx';
 
             GenerateInvoiceJournalJob::dispatch(
+                invoiceId: $invoice->id,
                 customerRefNo: $validated['customer_ref_no'],
                 refDate: $validated['ref_no'],
                 dateFrom: $validated['date_from'],
@@ -315,6 +316,7 @@ class InvoiceController extends Controller
                 filePath: $filePath,
                 exportedBy: $exportedBy,
             )->afterCommit();
+            
 
             /*
             |--------------------------------------------------------------------------

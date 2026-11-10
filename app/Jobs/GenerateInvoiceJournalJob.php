@@ -25,6 +25,7 @@ class GenerateInvoiceJournalJob implements ShouldQueue
     public int $timeout = 120;
 
     public function __construct(
+        public int $invoiceId,
         public string $customerRefNo,
         public string $refDate,
         public string $dateFrom,
@@ -55,48 +56,57 @@ class GenerateInvoiceJournalJob implements ShouldQueue
             ? Carbon::parse($this->dueDate)->toDateString()
             : $invoiceDate;
 
+        
         /*
         |--------------------------------------------------------------------------
-        | 1. Query upload_data
+        | 1. Get Invoice from invoices table
         |--------------------------------------------------------------------------
         */
 
-        $query = DB::table('upload_data')
-            ->where('customer_reference_no', $this->customerRefNo)
-            ->whereBetween('accounting_date', [
-                $fromDate,
-                $toDate,
+        $invoice = DB::table('invoices')
+            ->where('id', $this->invoiceId)
+            ->first([
+                'id',
+                'customer_ref_no',
+                'untaxed_amount',
+                'tax_amount',
+                'total_amount',
+                'tax',
             ]);
 
-        if ($this->waybillNos !== null) {
-            if (empty($this->waybillNos)) {
-                throw new RuntimeException(
-                    'No waybills found for invoice journal.'
-                );
-            }
+        if (!$invoice) {
+            throw new RuntimeException(
+                "Invoice #{$this->invoiceId} not found."
+            );
+        }
 
-            $query->whereIn('waybill_no', $this->waybillNos);
+        if ($invoice->customer_ref_no !== $this->customerRefNo) {
+            throw new RuntimeException(
+                'Invoice customer reference mismatch.'
+            );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | 2. Calculate total amount
+        | 2. Calculate Invoice Amounts
         |--------------------------------------------------------------------------
         */
 
-        $amounts = $query->selectRaw('
-            SUM(untaxed_amount) as untaxed_amount,
-            SUM(tax_amount) as tax_amount,
-            SUM(total_amount) as total_amount
-        ')->first();
-
-        $untaxedAmount = (float) ($amounts->untaxed_amount ?? 0);
-        $taxAmount = (float) ($amounts->tax_amount ?? 0);
-        $totalAmount = (float) ($amounts->total_amount ?? 0);
+        $untaxedAmount = (float) $invoice->untaxed_amount;
+        $taxAmount = (float) $invoice->tax_amount;
+        $totalAmount = (float) $invoice->total_amount;
+        $taxRate = (float) $invoice->tax;
 
         if ($totalAmount <= 0) {
             throw new RuntimeException(
-                'No positive express income amount found.'
+                'No positive invoice total amount found.'
+            );
+        }
+
+        // Validate journal balance
+        if (abs($totalAmount - ($untaxedAmount + $taxAmount)) > 0.01) {
+            throw new RuntimeException(
+                'Invoice amounts do not balance.'
             );
         }
 
@@ -105,10 +115,9 @@ class GenerateInvoiceJournalJob implements ShouldQueue
         | 3. Prepare journal rows
         |--------------------------------------------------------------------------
         */
-
-        $period = Carbon::parse($invoiceDate)->format('F Y');
-
         $rows = [];
+
+        $hasTax = $taxAmount > 0;
 
         // 1. Invoice Income (Debit)
         $rows[] = [
@@ -117,15 +126,20 @@ class GenerateInvoiceJournalJob implements ShouldQueue
             $this->analyticAccount,
             $invoiceDate,
             $dueDate,
-            $untaxedAmount,
+            $hasTax ? $totalAmount : $untaxedAmount,
             0,
             $this->operatingUnit,
             "{$invoiceDate} {$this->customerRefNo} Invoice Income for {$this->refDate}",
         ];
 
-        // 2. Tax Row (Only when tax amount > 0)
-        if (round($taxAmount, 2) > 0) {
-            $taxRate = $untaxedAmount > 0 ? round(($taxAmount / $untaxedAmount) * 100, 2) : 0;
+        // 2. Commercial Tax (Credit)
+        if ($hasTax) {
+
+            $formattedTaxRate = number_format($taxRate, 2, '.', '');
+            $formattedTaxRate = rtrim(
+                rtrim($formattedTaxRate, '0'),
+                '.'
+            );
 
             $rows[] = [
                 '272384',
@@ -136,19 +150,19 @@ class GenerateInvoiceJournalJob implements ShouldQueue
                 0,
                 $taxAmount,
                 $this->operatingUnit,
-                "{$invoiceDate} {$this->customerRefNo} Invoice Tax {$taxRate}% for {$this->refDate}",
+                "{$invoiceDate} {$this->customerRefNo} Invoice {$formattedTaxRate}% Commercial Tax for {$this->refDate}",
             ];
         }
 
-        // 3. Invoice Receivable (Total Amount)
+        // 3. Invoice Receivable (Credit)
         $rows[] = [
             '506011',
             $this->customerRefNo,
             $this->analyticAccount,
             $invoiceDate,
             $dueDate,
-            $totalAmount,
             0,
+            $untaxedAmount,
             $this->operatingUnit,
             "{$invoiceDate} {$this->customerRefNo} Invoice Receivable for {$this->refDate}",
         ];
